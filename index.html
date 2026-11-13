@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>ESG 공시 점검기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+/* 레이아웃: 왼쪽 입력 패널, 오른쪽 결과(총점+레이더, 항목 7개, 비교표). 평택·당진항 발표 팔레트(네이비·청록)를 따른다. */
+:root{
+  --bg:#f4f5fa; --surface:#ffffff; --ink:#23274a; --muted:#5f6488; --line:#dcdfee; --soft:#eef0f8;
+  --navy:#2d3159; --indigo:#4b5183; --teal:#2f9e9a; --sky:#6f9fd6; --gray:#c4c8d8; --alert:#d7263d;
+  --s0:#eceff8; --s1:#cdd5ef; --s2:#9aaadf; --s3:#6475c4; --mark:#fff1b8; --markink:#3a2f00;
+  --font:'Noto Sans KR',system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12152a; --surface:#1b2042; --ink:#e9ebf8; --muted:#a2a7cb; --line:#2f3563; --soft:#242a52;
+  --navy:#b9c0ee; --indigo:#8d95d6; --teal:#4fc2bd; --sky:#86b3e8; --gray:#4a5079;
+  --s0:#262c58; --s1:#343e7a; --s2:#4d5ca6; --s3:#7f90dc; --mark:#5a4b10; --markink:#fff3c4; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12152a; --surface:#1b2042; --ink:#e9ebf8; --muted:#a2a7cb; --line:#2f3563; --soft:#242a52;
+  --navy:#b9c0ee; --indigo:#8d95d6; --teal:#4fc2bd; --sky:#86b3e8; --gray:#4a5079;
+  --s0:#262c58; --s1:#343e7a; --s2:#4d5ca6; --s3:#7f90dc; --mark:#5a4b10; --markink:#fff3c4; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.55;
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1160px;margin:0 auto;padding-block:28px 56px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:clamp(26px,4vw,38px);font-weight:900;letter-spacing:-.02em;color:var(--navy);text-wrap:balance}
+header p{margin:0;max-width:560px;color:var(--muted);font-size:14px}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel h2{margin:0;font-size:15px;font-weight:700;color:var(--navy)}
+label{font-size:13px;font-weight:500;color:var(--muted);display:block;margin-bottom:4px}
+input[type=text],input[type=number],textarea,select{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+textarea{min-height:92px;resize:vertical}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.row2{display:grid;grid-template-columns:1fr 92px;gap:10px}
+.drop{border:1.5px dashed var(--gray);border-radius:12px;padding:18px 14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--bg);transition:border-color .15s,background .15s}
+.drop:hover,.drop.on{border-color:var(--teal);background:var(--soft)}
+.drop b{display:block;color:var(--navy);font-size:15px;margin-bottom:2px}
+.drop small{font-size:12.5px}
+button{font:inherit;font-size:14px;font-weight:700;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--navy);padding:8px 14px;cursor:pointer}
+button:hover{background:var(--soft)}
+button.pri{background:var(--navy);color:var(--surface);border-color:var(--navy)}
+:root[data-theme="dark"] button.pri,:root:not([data-theme="light"]) button.pri{}
+button.pri:hover{filter:brightness(1.12);background:var(--navy)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.status{font-size:13px;color:var(--muted);min-height:1.4em}
+.status.err{color:var(--alert)}
+details>summary{cursor:pointer;font-size:13.5px;font-weight:500;color:var(--indigo)}
+.fine{font-size:12.5px;color:var(--muted);margin:0}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--soft);color:var(--indigo)}
+.tag.ex{background:var(--mark);color:var(--markink)}
+/* 결과 */
+.sum{display:grid;grid-template-columns:minmax(0,230px) minmax(0,1fr);gap:20px;align-items:center}
+@media (max-width:560px){.sum{grid-template-columns:minmax(0,1fr)}}
+.who{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px}
+.who h2{font-size:20px}
+.total{display:flex;align-items:baseline;gap:6px;margin:6px 0 2px}
+.total b{font-size:54px;font-weight:900;line-height:1;color:var(--navy);font-variant-numeric:tabular-nums}
+.total span{color:var(--muted);font-size:16px}
+.bar{height:10px;border-radius:99px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--teal));border-radius:99px}
+svg text{font-family:var(--font)}
+.items{display:flex;flex-direction:column;gap:10px}
+.it{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.it>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 14px;padding:12px 14px;align-items:center}
+.it>summary::-webkit-details-marker{display:none}
+.it h3{margin:0;font-size:15px;font-weight:700;color:var(--ink)}
+.it .meta{font-size:12.5px;color:var(--muted)}
+.meter{display:flex;gap:4px;align-items:center}
+.meter i{width:26px;height:10px;border-radius:3px;background:var(--soft)}
+.meter i.f0{background:var(--s0)} .meter i.f1{background:var(--s1)} .meter i.f2{background:var(--s2)} .meter i.f3{background:var(--s3)}
+.score{font-size:22px;font-weight:900;color:var(--navy);min-width:1.4em;text-align:right;font-variant-numeric:tabular-nums}
+.sc{display:flex;align-items:center;gap:10px}
+.body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line)}
+.crit{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px}
+@media (max-width:640px){.crit{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.crit div{font-size:12px;color:var(--muted);background:var(--bg);border-radius:8px;padding:7px 8px;border:1px solid transparent}
+.crit div b{display:block;color:var(--ink);font-size:12.5px}
+.crit div.on{border-color:var(--teal);background:var(--soft)}
+.ev{margin:0;padding:10px 12px;background:var(--bg);border-radius:8px;font-size:13.5px;border-left:3px solid var(--sky)}
+.ev .pg{font-weight:700;color:var(--indigo);margin-right:6px;white-space:nowrap}
+.ev mark{background:var(--mark);color:var(--markink);padding:0 2px;border-radius:2px}
+.ev .fl{display:inline-block;margin-left:6px;font-size:11.5px;font-weight:700;color:var(--teal)}
+.ovr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:13px;color:var(--muted)}
+.ovr select{width:auto}
+.none{font-size:13.5px;color:var(--muted)}
+/* 표 */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:500}
+td:first-child,th:first-child{text-align:left}
+td.c0{background:var(--s0);color:#23274a} td.c1{background:var(--s1);color:#10203a} td.c2{background:var(--s2);color:#04201f} td.c3{background:var(--s3);color:var(--surface)}
+:root[data-theme="dark"] td.c3{color:#12152a}
+td.sumc{font-weight:900;color:var(--navy)}
+.rm{border:0;background:none;color:var(--muted);font-size:16px;padding:0 4px;font-weight:400}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.empty{padding:18px;text-align:center;color:var(--muted);font-size:14px;background:var(--bg);border-radius:10px}
+
+[hidden]{display:none!important}
+/* 탭·채점 결과 */
+.tabrow{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.tabs{display:inline-flex;gap:4px;padding:4px;background:var(--soft);border-radius:12px}
+.tabs button{border:0;background:none;color:var(--muted);padding:8px 18px;border-radius:9px}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--navy);box-shadow:0 1px 3px rgba(20,24,60,.14)}
+#presBtn[aria-pressed="true"]{background:var(--navy);color:var(--surface);border-color:var(--navy)}
+.kpi{display:flex;flex-wrap:wrap;gap:6px 26px;align-items:baseline;margin:0}
+.kpi div{display:flex;align-items:baseline;gap:6px;color:var(--muted);font-size:13.5px}
+.kpi b{font-size:30px;font-weight:900;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1.1}
+.filters{display:flex;flex-wrap:wrap;gap:8px 22px}
+.fl{display:flex;flex-wrap:wrap;gap:6px}
+.fl button{padding:5px 13px;font-size:13px;border-radius:99px}
+.fl button[aria-pressed="true"]{background:var(--navy);color:var(--surface);border-color:var(--navy)}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.cards{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.card span{font-size:12.5px;color:var(--muted);font-weight:500}
+.card b{font-size:19px;font-weight:900;color:var(--navy);line-height:1.3}
+.card em{font-style:normal;font-size:14px;font-weight:700;color:var(--indigo)}
+.card small{font-size:12px;color:var(--muted)}
+.card.warn b{color:var(--alert)}
+.card.wide{grid-column:span 2}
+@media (max-width:760px){.card.wide{grid-column:auto}}
+#rt th.it7{min-width:58px;white-space:normal;line-height:1.25}
+#rt tbody tr.row{cursor:pointer}
+#rt tbody tr.row:hover td:first-child,#rt tbody tr.row:hover td:nth-child(2){background:var(--soft)}
+#rt tbody tr.row td{position:relative}
+#rt tbody tr.row.gstart td{border-top:2px solid var(--line)}
+#rt tr.row.flash td:first-child,#rt tr.row.flash td:nth-child(2){background:var(--mark);color:var(--markink)}
+#rt tr.row td:first-child b{font-weight:700;color:var(--ink)}
+#rt tr.row td:first-child small{color:var(--muted);margin-left:6px;font-size:11.5px}
+.utag{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;padding:1px 7px;border-radius:99px;background:var(--mark);color:var(--markink)}
+#rt td.adj::after{content:"";position:absolute;right:0;top:0;border-style:solid;border-width:0 9px 9px 0;border-color:transparent var(--alert) transparent transparent}
+i.adjk{width:0!important;height:0!important;border-style:solid;border-width:0 10px 10px 0;border-color:transparent var(--alert) transparent transparent;border-radius:0!important;background:none!important}
+#rt tr.none td{background:repeating-linear-gradient(135deg,var(--bg) 0 8px,var(--soft) 8px 16px);color:var(--alert);font-weight:700;text-align:left}
+#rt tr.det>td{white-space:normal;text-align:left;background:var(--bg);padding:12px 14px 16px}
+#rt tr.det .dg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+@media (max-width:760px){#rt tr.det .dg{grid-template-columns:minmax(0,1fr)}}
+.dgi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13px;min-width:0}
+.dgi h4{margin:0 0 4px;font-size:13px;color:var(--navy);display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.dgi h4 em{font-style:normal;font-weight:900;font-size:15px}
+.dgi h4 s{color:var(--alert);font-size:12px;font-weight:400}
+.dgi q{display:block;quotes:none;color:var(--ink);overflow-wrap:anywhere}
+.dgi .pg{display:block;margin-top:4px;font-size:12px;color:var(--indigo);font-weight:700}
+.dgi .why{display:block;margin-top:4px;font-size:12px;color:var(--alert)}
+.memo{margin:10px 0 0;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}@media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
+.notes{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:6px;font-size:14px}
+#adjT td{white-space:normal;text-align:left}
+#adjT td:nth-child(n+3):nth-child(-n+5){text-align:center;white-space:nowrap}
+#pc svg,#avg svg{max-width:560px;display:block}
+.lgd{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--muted);margin-top:4px}
+.lgd i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:560px){.pgrid{grid-template-columns:minmax(0,1fr)}}
+.pgrid h3{margin:0 0 4px;font-size:13px;color:var(--muted);font-weight:500}
+.hint{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.hint select{width:auto}
+/* 발표 보기: 큰 글자, 핵심만 */
+body.pres .wrap{max-width:1360px}
+body.pres #rt{font-size:17px}
+body.pres #rt th{font-size:13.5px}
+body.pres #rt th,body.pres #rt td{padding:9px 11px}
+body.pres .kpi b{font-size:44px}
+body.pres .kpi div{font-size:16px}
+body.pres .card b{font-size:25px}
+body.pres .card em{font-size:17px}
+body.pres .card span,body.pres .card small{font-size:14.5px}
+body.pres .fl button{font-size:15px;padding:7px 16px}
+body.pres .fine,body.pres #adjBox,body.pres .notesbox,body.pres #userNote,body.pres .lgd{font-size:14px}
+body.pres #adjBox,body.pres .notesbox,body.pres .fine{display:none}
+body.pres .panel h2{font-size:18px}
+
+/* ---- 다듬기 ---- */
+:root{--shadow:0 1px 2px rgba(30,36,90,.05),0 8px 24px -12px rgba(30,36,90,.14);--r:16px}
+:root[data-theme="dark"]{--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.5)}}
+body{background:linear-gradient(180deg,var(--soft) 0,var(--bg) 320px) var(--bg);background-repeat:no-repeat;letter-spacing:-.005em}
+.wrap{gap:20px;padding-block:36px 72px}
+header{padding-bottom:6px;align-items:flex-end}
+header::before{content:"대기환경관리 · 항만 ESG 공시";flex-basis:100%;font-size:12.5px;font-weight:700;letter-spacing:.08em;color:var(--teal)}
+h1{font-size:clamp(28px,4.4vw,42px);letter-spacing:-.03em;line-height:1.15}
+header p{font-size:14px;line-height:1.6}
+.panel{border-radius:var(--r);box-shadow:var(--shadow);padding:24px;gap:16px}
+.panel h2{font-size:16px;display:flex;align-items:center;gap:9px}
+.panel h2::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--teal);flex:none}
+.who h2::before,#adjBox h2::before{display:none}
+.tabs{padding:5px;border:1px solid var(--line);background:var(--surface);box-shadow:var(--shadow)}
+.tabs button{padding:9px 22px;font-size:14px}
+.tabs button[aria-selected="true"]{background:var(--navy);color:var(--surface);box-shadow:none}
+.kpi{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi div{flex-direction:column;align-items:flex-start;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 16px;font-size:12.5px}
+.kpi div b{order:-1;font-size:28px}
+@media (max-width:760px){.kpi{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi b{font-size:24px}}
+.card{background:var(--surface);border-radius:12px;padding:14px 16px;border-left:4px solid var(--teal)}
+.card:nth-child(2){border-left-color:var(--indigo)}
+.card span{font-weight:700;letter-spacing:.02em}
+.filters{padding:2px 0 4px;gap:10px 28px}
+.fl{padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:99px;gap:2px}
+.fl button{border:0;background:none;color:var(--muted);padding:6px 14px;font-weight:500}
+.fl button:hover{background:var(--soft)}
+.fl button[aria-pressed="true"]{background:var(--navy);color:var(--surface);font-weight:700}
+.tw{border:1px solid var(--line);border-radius:12px}
+#rt{border-collapse:separate;border-spacing:0}
+#rt thead th{background:var(--bg);color:var(--muted);font-weight:700;font-size:12px;border-bottom:1px solid var(--line)}
+#rt tbody td{border-bottom:1px solid var(--line)}
+#rt td.c0,#rt td.c1,#rt td.c2,#rt td.c3{font-weight:700;border-bottom-color:var(--surface);box-shadow:inset 0 0 0 1px var(--surface)}
+#rt td.sumc{background:var(--bg);font-size:15px}
+#rt tbody tr.row:hover td:first-child,#rt tbody tr.row:hover td:nth-child(2){background:var(--soft)}
+.legend{padding-top:2px}
+.dgi{border-radius:12px}
+.notes{gap:8px;line-height:1.65}
+details.panel>summary{font-weight:700;color:var(--navy);font-size:15px}
+.drop{border-radius:14px;padding:24px 16px;background:linear-gradient(180deg,var(--bg),var(--soft))}
+button{border-radius:10px;transition:background .15s,filter .15s}
+button.pri{box-shadow:0 4px 12px -6px rgba(45,49,89,.6)}
+.total b{font-size:60px}
+.bar{height:10px;border-radius:99px}
+.bar i{border-radius:99px}
+input[type=text],input[type=number],textarea,select{border-radius:10px;padding:9px 12px}
+@media (max-width:560px){.panel{padding:16px}.wrap{padding-block:24px 56px}.tabs button{padding:8px 16px}}
+@media (max-width:760px){.kpi div b{font-size:20px;white-space:nowrap}.kpi div{padding:10px 12px}}
+.kpi div{min-width:0}
+
+/* 점수 칸: 한 가지 색의 농도(0 연함 → 3 진함), 총점이 주인공 */
+#rt td.c0,#rt td.c1,#rt td.c2,#rt td.c3{font-weight:500;font-size:13px;box-shadow:none;border-bottom:1px solid var(--surface)}
+#rt td.c0{color:var(--muted)} #rt td.c1{color:var(--ink)} #rt td.c2{color:#0f1538} #rt td.c3{color:#fff}
+:root[data-theme="dark"] #rt td.c2{color:#e9ebf8} :root[data-theme="dark"] #rt td.c3{color:#12152a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) #rt td.c2{color:#e9ebf8}:root:not([data-theme="light"]) #rt td.c3{color:#12152a}}
+#rt thead th:last-child{color:var(--navy);font-size:12.5px}
+#rt td.sumc{position:relative;min-width:84px;text-align:right;padding:6px 12px 10px;background:var(--bg);border-left:2px solid var(--line)}
+#rt td.sumc b{font-size:19px;font-weight:900;color:var(--navy);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+#rt td.sumc i{position:absolute;left:10px;bottom:5px;height:4px;width:calc((100% - 20px)*var(--w,0));border-radius:99px;background:var(--teal)}
+#rt td.sumc::after{content:"";position:absolute;left:10px;right:10px;bottom:5px;height:4px;border-radius:99px;background:var(--line);z-index:0}
+#rt td.sumc i{z-index:1}
+body.pres #rt td.sumc b{font-size:24px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>ESG 공시 점검기</h1>
+    <p>선사 3곳·항만공사 4곳의 지속가능경영보고서를 대기오염 관리 공시 7개 항목으로 채점한 결과와, PDF를 올려 점수를 추정해 보는 점검 도구입니다.</p>
+  </header>
+
+  <div class="tabrow">
+  <nav class="tabs" role="tablist" aria-label="화면 선택">
+    <button type="button" role="tab" id="tabResults" aria-controls="viewResults" aria-selected="true">채점 결과</button>
+    <button type="button" role="tab" id="tabChecker" aria-controls="viewChecker" aria-selected="false">점검 도구</button>
+  </nav>
+  </div>
+
+  <div id="viewResults" role="tabpanel" aria-labelledby="tabResults" style="display:flex;flex-direction:column;gap:22px">
+    <section class="panel">
+      <div class="kpi" id="kpi"></div>
+      <div class="cards" id="cards"></div>
+      <div class="filters">
+        <div class="fl" id="fl" role="group" aria-label="기관 유형 보기"></div>
+        <div class="fl" id="fp" role="group" aria-label="규제 구간 보기"></div>
+      </div>
+      <div class="tw"><table id="rt"></table></div>
+      <div class="legend"><span>항목 점수(색이 진할수록 높음)</span><span><i style="background:var(--s0);border:1px solid var(--line)"></i>0 언급 없음</span><span><i style="background:var(--s1)"></i>1 서술만</span><span><i style="background:var(--s2)"></i>2 수치 공개</span><span><i style="background:var(--s3)"></i>3 수치+추이+검증</span><span><i class="adjk"></i>점수를 조정한 칸</span><span><i style="background:var(--teal);height:4px;margin-top:4px"></i>총점 막대(21점 만점)</span></div>
+      <p class="fine" id="userNote"></p>
+      <p class="fine">행을 누르면 항목별 근거 문장과 쪽 번호가 열립니다. 연도는 보고서 발간연도가 아니라 실적연도입니다. 구간은 A 2019년 이전(규제 전), B 2020~2021(IMO 0.5%·정박 0.1%), C 2022년 이후(전 해역 0.1%)이고, 건수가 적어 구간 평균은 추세가 아니라 참고용입니다.</p>
+    </section>
+
+    <div class="two">
+    <section class="panel"><h2>규제 구간별 평균 총점</h2><div id="pc"></div><p class="fine" id="pcNote"></p></section>
+      <section class="panel"><h2>항목별 평균 점수</h2><div id="avg"></div><p class="fine" id="avgNote"></p></section>
+    </div>
+
+    <details class="panel" id="adjBox">
+      <summary id="adjSum">점수 조정 내역</summary>
+      <div class="tw" style="margin-top:10px"><table id="adjT"></table></div>
+    </details>
+
+    <section class="panel notesbox">
+      <h2>이 결과로 말할 수 있는 것</h2>
+      <ul class="notes">
+        <li>설치·도입 항목(④ 스크러버·대체연료, ⑤ 육상전원)은 공개가 잘 되지만, 배출량(①②)과 연료 황함량(③)은 항만공사에서 약합니다.</li>
+                <li>기관·연도 수가 적어(7개 기관, 24건) 시간에 따른 추세나 규제의 영향은 말할 수 없습니다.</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="grid" id="viewChecker" role="tabpanel" aria-labelledby="tabChecker" hidden>
+    <!-- 입력 -->
+    <aside class="panel" aria-label="보고서 입력">
+      <h2>보고서 넣기</h2>
+      <div class="row2">
+        <div><label for="orgName">기관명</label><input type="text" id="orgName" value="HMM" autocomplete="off"></div>
+        <div><label for="orgYear">연도</label><input type="number" id="orgYear" value="2024" min="2010" max="2030"></div>
+      </div>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="PDF 파일 선택">
+        <b>PDF를 끌어 놓거나 눌러서 선택</b>
+        <small>여러 개를 한꺼번에 올리면 비교표에 모두 담깁니다.<br>파일명이 <em>기관명_연도_보고서.pdf</em> 형식이면 이름과 연도를 자동으로 읽습니다.</small>
+      </div>
+      <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+      <details>
+        <summary>PDF 대신 텍스트 붙여넣기</summary>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          <textarea id="paste" placeholder="보고서에서 복사한 글을 붙여 넣으세요. 쪽 구분은 한 줄에 ===== 를 적습니다."></textarea>
+          <div class="btns"><button type="button" id="runPaste">점검하기</button></div>
+        </div>
+      </details>
+      <div class="btns"><button type="button" id="loadSample">HMM 예시 다시 보기</button></div>
+      <div class="status" id="status" role="status"></div>
+      <p class="fine">점수는 키워드와 수치 패턴으로 구한 추정값입니다. 근거 문장을 읽고 항목마다 사람이 확정하세요. 글자가 안 읽히는 스캔본 PDF는 점검이 되지 않습니다. 올린 파일은 이 브라우저 안에서만 처리되고 서버로 보내지 않습니다.</p>
+    </aside>
+
+    <!-- 결과 -->
+    <main style="display:flex;flex-direction:column;gap:22px;min-width:0">
+      <section class="panel" aria-live="polite">
+        <div class="sum">
+          <div>
+            <div class="who"><h2 id="rName">HMM 2024</h2><span class="tag ex" id="rTag">예시</span></div>
+            <div class="total"><b id="rTotal">0</b><span>/ 21점</span></div>
+            <div class="bar"><i id="rBar" style="width:0%"></i></div>
+            <p class="fine" id="rNote" style="margin-top:8px"></p>
+          </div>
+          <div id="radar" style="min-width:0"></div>
+        </div>
+        <div class="btns"><button type="button" class="pri" id="addList">비교표에 추가</button></div>
+        <div class="hint">
+          <label for="mgGrp" style="margin:0">구분</label>
+          <select id="mgGrp"><option value="선사">선사</option><option value="항만공사">항만공사</option></select>
+          <button type="button" class="pri" id="mergeBtn">채점 결과에 합치기</button>
+        </div>
+        <p class="fine">항목마다 확정한 점수를 ‘채점 결과’ 화면의 표·평균·구간 그래프에 넣습니다. 이 브라우저에만 저장됩니다.</p>
+      </section>
+
+      <section class="items" id="items" aria-label="항목별 결과"></section>
+
+      <section class="panel">
+        <h2>비교표</h2>
+        <div id="cmp"></div>
+        <div class="legend"><span><i style="background:var(--s0)"></i>0 언급 없음</span><span><i style="background:var(--s1)"></i>1 서술만</span><span><i style="background:var(--s2)"></i>2 수치 공개</span><span><i style="background:var(--s3)"></i>3 수치+목표·추이+검증</span></div>
+        <div class="btns"><button type="button" id="copyTsv">표 복사</button><button type="button" id="clearList">비우기</button></div>
+        <p class="fine" id="cmpNote"></p>
+      </section>
+
+      <details class="panel">
+        <summary>채점 기준 (연구팀 초안)</summary>
+        <div class="tw" id="rubric" style="margin-top:10px"></div>
+      </details>
+    </main>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+(function(){
+'use strict';
+var SAMPLE = {"name": "HMM", "year": 2024, "src": "2024 에이치엠엠 ESG Focus 발췌 7쪽", "pages": [{"p": 11, "t": "HMM OVERVIEW HMM’S SUSTAINABLE STORY I 2024 에이치엠엠 ESG FOCUS APPENDICES I 11 UN SDGs Net Zero를 향한 항해 #1 HMM은 국제사회의 기후변화 대응에 적극적으로 부응하며 지구온난화에 대한 책임감 있는 자세로 저탄소 친환경 기업으로 성장하고자 합니다. 한눈에 보는 2024년 실적 저탄소 선박 확보 현황 및 목표 HMM은 매년 적극적인 온실가스(CO2, CH4, N2O) 감축을 통해 2045년까지 Scope 1,2,3을 포괄하는 메탄올 Dual Fuel 선박 Net Zero 달성을 목표로 하고 있습니다. 또한, Net Zero 로드맵 내 온실가스 감축을 위한 2030년 기준 2025 2026 4척 9척 여러 중간목표들을 수립하여, 매년 이행 실적을 관리하고 있습니다. LNG Dual Fuel 선박 HMM 선박 CII 충족 현황 2025 2026 4척 6척 2030 전 선대 35% 확보 A~C D~E *사선 + 장기용선 (누적 척수) 9%1) 6% 전체 선대 컨테이너 선대 94% 91% ZOOM-IN 1)’25년 상반기 기준 E등급 선박 미보유 저탄소 선박 확보 HMM은 국내 최초로 LNG Dual Fuel 컨테이너선 2척(HMM 오션호, HMM 스카이호)을 인도받아 2025년 1월부터 HMM의 인도-지중해 항로에 투입하였습니다. LNG Dual Fuel 컨테이너선은 기존 선박 대비 이산화탄소(CO₂) 배출량을 약 30%, 질소산화물(Nox)을 85% 감소시키며, 황산화물(Sox)과 온실가스 집약도 감축률 목표 및 이행 실적 전체 선대 Net Zero 컨테이너 선대 기준연도: 2008년 미세먼지는 99%까지 줄일 수 있어 배출량 절감 측면에서 우수한 성능을 자랑합니다. 아울러, HMM은 9,000TEU급 저탄소 컨테이너선 HMM 그린호를 공식 인수하였습니다. 국내 최초 메탄올 Dual Fuel 컨테이너선인 그린호는 폐타이어 등 폐자원을 원료로 생산되는 바이오메탄올을 활용하며 기존 화석연료 대비 탄소 배출 65% 이상, 황산화물(Sox) 100%, 질소산화물 (NOx) 80% 가량을 저감합니다. 70% 감축 50% 감축 2022 2023 2024 2030 2045"}, {"p": 13, "t": "HMM OVERVIEW #1 HMM’S SUSTAINABLE STORY I I 2024 에이치엠엠 ESG FOCUS APPENDICES 13 Net Zero를 향한 항해 2024 온실가스 인벤토리 HMM 2030 온실가스 절대배출량 감축 목표 HMM은 매년 기 구축한 온실가스 인벤토리 체계를 기반으로 Scope 1, Scope 2, Scope 3 범주로 온실가스 HMM은 연료 연소뿐 아니라 전 과정 평가(LCA) 관점에서 온실가스를 저감하고자 해운 부문의 2030년 배출량을 산정하고 있습니다. 2024년 온실가스 배출량 산정 결과는 제3자 기관으로부터 검증 받아 객관성과 절대배출량 감축 목표를 수립하였습니다. 특히 매출의 약 90%를 차지하는 컨테이너 부문에 대해서는 별도 정확성을 높였습니다. 목표를 설정하여 집중 관리하고 있습니다. 저탄소 선박 도입과 친환경 연료 전환, 선대 효율성 제고 등을 통해 중기 감축 목표 달성을 추진할 계획입니다. 2024년 온실가스 배출량 구분 단위 Scope 1 Scope 2 Scope 3 총 배출량 시장기반 tCO2e 5,993,765 13,2961) 2,831,583 8,838,6441) 지역기반 tCO2e 5,993,765 16,926 2,831,583 8,842,275 해운 부문 7.18 컨테이너 부문 범위: Scope 1 + Scope 3, Cat.3 (단위: Mt CO2e) 6.14 1) 종속기업 WUT의 Scope 2 배출량은 시장기반으로, 그 외 기업들은 지역기반으로 산정 5.28 5.71 7% 내부탄소가격제 감축 5.06 HMM은 Net Zero 달성을 목표로 온실가스 배출량 감축을 장려하고 IMO의 배출량 규제 등 외부 규제로 인한 3.75 위험을 주요 투자 의사결정 시 반영하기 위해 내부탄소가격제도를 도입하고 있습니다. 기존에는 투자 심의 26% 감축 과정에서 내부탄소가격의 반영은 필수가 아니었으나, 2025년부터 HMM의 가장 중요한 배출원인 선박의 투자 심의 시 내부탄소가격을 검토하도록 내부 규정에 반영하였습니다. 내부탄소가격은 국내외 탄소 가격, 시나리오별 탄소가격 전망치, 글로벌 정책 변화를 고려하여 주기적으로 검토하고 설정하고 있습니다. 2021 (기준연도) 넷제로 슬로건 제작 및 활용 2024 (실적) 2030 (목표) HMM은 2024년 친환경 경영 의지를 담은 넷제로 슬로건을 제작해 Net Zero 달성 의지를 표명했습니다. 이를 기반으로 탄소 저감 선도 기업 이미지를 강조하는 마케팅 전략을 펼치며, 해당 슬로건을 다양한 채널에서 적극 활용하고 있습니다."}, {"p": 14, "t": "HMM OVERVIEW #1 I HMM’S SUSTAINABLE STORY I 2024 에이치엠엠 ESG FOCUS APPENDICES 14 Net Zero를 향한 항해 Towards Green HMM Green Horizon Green Movement Green Management 저탄소 선박 도입 저탄소 내륙 운송 체계 구축 HMM은 Net Zero 목표 달성을 위해 저탄소 선박을 적극적으로 HMM은 온실가스 저감을 통해 지속가능한 운송체계를 국내외에서 구축하고 있습니다. 미국 오클랜드에서는 도입하고 있습니다. 2030년까지 선대의 35%를 저탄소 선박으로 수소·전기 트럭을 활용한 항만-레일 터미널 셔틀 운송으로 NorCal Zero 인증을 받았고, 독일에서는 전기트럭 전환할 예정이며, 이를 위해 LNG Dual Fuel 컨테이너선 2척(HMM 오션호, HMM 스카이호)을 인도받아 2025년 1월부터 HMM의 인도- 4척 지중해 항로에 투입하였습니다. 아울러, HMM은 9,000TEU급 저탄소 컨테이너선 HMM 그린호를 공식 인수하였습니다. 인도-지중해 항로에 투입되는 HMM 그린호는 대체 연료인 메탄올을 사용하는 선박입니다. HMM은 암모니아, 수소 등 다양한 차세 대 대체 연료 연구 개발에도 2025년 상반기 적극 참여하는 동시에 2026년 상반기까지 메탄올 추진선 총 9척을 저탄소 선박 도입 순차적으로 인도할 계획입니다. 항만 육상 전력 AMP(Alternative Maritime Power) 사용 HMM은 선박의 온실가스를 포함한 대기오염물질의 배출을 줄이기 위해 항만 육상 전력(AMP)를 사용할 수 있도록 추진하고 있습니다. 강제 규정이 있는 미국 서해안 지역에서는 매년 사용률 실적을 모니터링하고 있으며, 2024년 연간 기준 Los Angeles/Long Beach에서는 100%, Oakland에서는 98%의 사용률을 보이고 있습니다. 이외에도 육상전력을 사용할 수 있는 모든 지역에서 최대한 사용하려는 노력을 통해 대기 오염 물질 배출을 최소화하고자 합니다. 업체와 협력해 근거리 셔틀 운송을 시작, 2025년 2분기엔 유럽 내륙까지 확대할 예정입니다. 국내에서는 한국철도공사와 협력해 해운-철도 연계 탄소 저감 물류망을 구축하고 있습니다."}, {"p": 15, "t": "HMM OVERVIEW #1 I HMM’S SUSTAINABLE STORY I 2024 에이치엠엠 ESG FOCUS APPENDICES Net Zero를 향한 항해 Towards Green HMM Green Horizon Green Movement Green Management 저탄소 연료 사용 국내 최초 선박용 탄소 포집 시스템(OCCS1)) HMM은 2023년부터 GS Caltex와 협력하여 선박 바이오연료 공급 인프라를 구축하고 있으며, 2024년에는 HMM은 국내 최초로 선박용 이산화탄소 포집·저장장치를 2,200TEU급 세계 1위 항만인 상해항을 모항으로 하는 상해국제항만그룹(SIPG)과 ‘상해항 친환경 연료 벙커링 컨테이너선 HMM 몽글라호에 설치 및 실증하였고, 해당 과정에서 업무협약’을 체결하였습니다. 이러한 협력 관계에 기반을 두어 HMM은 2024년부터 바이오연료 사용을 발생된 이산화탄소(CO₂)를 저장하고 첫 하륙까지 완료하였습니다. 본격화하였으며, 향후 다양한 바이오연료의 도입만이 아니라 메탄올, LNG 대체 연료의 도입 및 사용 확대, HMM은 한국선급 등과 업무 협약을 체결하고 OCCS 상세 설계 및 차세대 연료 개발 등 넷제로를 위한 다양한 방안을 전개할 방침입니다. 기술 유효성 평가를 포함한 공동 연구를 진행했습니다. 이번 연구는 순수 국내 기술로 개발되었다는 점에서 의미가 크며, 특히 시간당 1톤, 하루 24톤의 CO₂를 포집·액화·저장할 수 있는 세계 최대 규모의 선박용 그린 세일링 서비스 (Green Sailing Service) 운영 OCCS 실증 사례로 평가됩니다. 그린 세일링 서비스는 저탄소 연료를 활용해 선박 운항 시 직접 감축한 탄소 배출량을 거래하는 방식으로, 1) Onboard Carbon Capture System 화주의 Scope 3 배출량 감축에 기여합니다. 2023년 3월 헬만(Hellmann)과의 첫 계약을 시작으로, 2024년 6월에는 이케아(IKEA)와 온실가스 감축분 1만 1,500톤에 대한 Green Sailing Service 계약을 체결했습니다. STEP 1 STEP 2 STEP 3 STEP 4 선박 운항 중 배출된 탄소 포집 바이오연료/LNG/ 바이오메탄올 등 저탄소 연료 구입 저탄소 연료 항해로 Scope 1 배출량 감축 고객이 온실가스 감축량 구매 고객의 Scope 3 배출량 감축 포집된 탄소 탱크 저장 탄소 처리 및 활용 15"}, {"p": 16, "t": "HMM OVERVIEW #1 I HMM’S SUSTAINABLE STORY I 2024 에이치엠엠 ESG FOCUS APPENDICES 16 Net Zero를 향한 항해 Towards Green HMM Green Horizon HMM 온실가스 관리 시스템 Green Movement Green Management 선박 운항 및 적재 최적화 HMM은 지속적으로 선박 운항 최적화 서비스를 강화해 왔으며, 현재 최적 운항 시스템의 파일럿 테스트를 GHG Inventory System • HMM 온실가스 배출량 표준화 및 시스템화 • 선박, 터미널 및 사무실 등에서 발생하는 온실가스 배출량의 체계적 관리 • 연결재무제표 기준 온실가스 배출량 산정 및 검증 진행 중입니다. 자체 개발한 성능 평가 툴 출시를 준비 중이며, 신규 선박에는 맞춤형 Trim Optimization 프로그램을 적용해 운항 효율을 높이고 있습니다. 선체 저항 감소 Supply Chain Carbon Calculator • 화물의 출발지부터 도착지까지 발생하는 온실가스 배출량 계산 시스템 • 해상 운송 뿐만 아니라 내륙 운송까지 포괄 • 화주고객 및 이해관계자에게 정확도 높은 배출량 제공 실리콘 페인트, 선저·프로펠러 소재 등으로 선체에 부착되는 생물로 인한 저항 증가를 방지, 선박 에너지 효율 향상 선박평형수 트림(Trim) 최적화 및 기상·배수량 고려로 평형수 및 펌프 운영 시간 최소화, 연료 소비 절감 및 효율 개선 속도최적화 기상, 항로, 스케줄 등 항해 정보 기반으로 연료 소모를 줄이는 최적 운항 속도 설정 기후 관련 위험 및 기회 관리 프로세스 Green Sailing Service Management • 저탄소 연료 사용을 통해 발생된 온실가스 감축량 재고 관리 시스템 HMM은 기후 변화로 인한 물리적 위험과 이에 대한 국제적 대응이 당사에 미치는 전환 위험 및 기회를 식별, 평가, 우선순위 설정, 모니터링하는 프로세스를 운영하고 있습니다. 기후 관련 위험은 ESG팀 및 R&D팀에서 상시 관리 중이며, 전사 리스크관리 실무규정에 따라 전사 위험관리 프로세스로 통합하여 Cll and Fit for 55 Management • IMO 및 EU 온실가스 배출량 규제 대응 위한 내부 시스템 • 선박 정보 및 운항 데이터 기반 결과 예측 및 의사결정 지원 • 선박 영향도 사전 파악 및 체계적인 관리 시행 관리하고 있습니다. 전사 위험 관리 체계로 통합- 상시 관리항목으로 통합 관리 전사 위험 관리 체계로 통합 - 상시 관리항목으로 통합 관리 기후 관련 위험 및 기회 평가- 단기, 중기, 장기에 따라 영향의 크기 예측 기후 관련 위험 및 기회 우선순위 설정- 영향의 크기에 따라 우선순위 설정 및 대응 방안 검토 기후 관련 위험 및 기회 모니터링- 정기적 식별 및 평가"}, {"p": 22, "t": "HMM OVERVIEW #4 HMM’S SUSTAINABLE STORY I I 2024 에이치엠엠 ESG FOCUS APPENDICES 22 공급망 ESG 리스크 관리 강화 HMM 구매 정책 및 지침 HMM의 공급사 HMM은 내‧외부적 위험의 최소화, 구매 업무 집중도 제고 및 사업 경쟁력 강화를 위하여 HMM 구매 정책 HMM은 전사에서 수행하고 있는 구매 내용을 세분화하여, 구매항목별 금액의 상위 80% 업체를 주요 및 지침을 수립하였습니다. 공급사로 선정하여 보다 집중적이고 전략적인 관리 체계를 구축 및 운용하고 있습니다. 2024년부터는 관리 구매항목을 12개로 확대하여 발생 가능한 공급망 리스크의 사전 예방, 공급사의 ESG 역량 강화 지원 및 상생 구매 정책 및 지침의 구성 기반의 파트너십을 구축하고 있습니다. HMM 구매 항목 구매 주체 및 역할 정의 • \u0007구매 실행 주체 / 구매 실행 주체의 변경 • 구매실행조직 및 구매관리조직의 역할 위기 관리 • \u0007책임의 분리 보험/법률자문사 선박 기자재, 연료유/윤활유 조선소, 입거 수리 Charter/ Broker 컨테이너운송 (트럭, 피더 등) 컨테이너 기기 컨테이너/벌크 대리점 항비(Agency) IT전산(기기, 장비, 서비스 등) 항차수리 일반관리비 (출장, 복리, 운송, 배송, 사옥 등) 컨테이너/벌크 터미널/하역 주요 공급사 기준: 구매 항목별 연간 구매액의 80% 이상을 차지하는 공급사 공급망 ESG 관리 절차 구매 과정 • \u0007사업 계획 수립 및 예산 확보 → 구매 요청 → 공급사 검증ㆍ등록 → 입찰 및 개찰 → 공급사 선정 → 계약 관리 → 구매주문 관리 → 납기 관리 → 검수 및 대금 지급 → 재고 관리 → 클레임 관리 정보 관리 HMM은 사업 운영에 기여하는 모든 이해관계자를 포괄하는 투명한 공급망을 구축하고 있습니다. 공급망 ESG 관리 절차 • \u0007구매 IT 시스템 공급망 평가 반영 구매실행조직 사전 리스크 평가 공급사 List-Up ESG팀 공급사 관리 • \u0007공 급사 평가 / 잠재 공급사 발굴 • \u0007공 급사 차별화 관리 / 특별 대상 관리 윤리 경영 구매실행조직 ESG평가 결과 기반 공급망 ESG 실사 • \u0007윤리 경영 전달 공급사 선정 구매관리조직 공급사 ESG평가 (사후 리스크 평가) 구매계약"}, {"p": 32, "t": "HMM OVERVIEW I HMM’S SUSTAINABLE STORY I 32 2024 에이치엠엠 ESG FOCUS APPENDICES ESG 주요 성과 환경 성과 분류 지표 단위 데이터 tCO2e 5,993,765 tCO2e 16,926 시장기반 tCO2e 1) 13,296 지역기반 tCO2e 6,010,691 시장기반 tCO2e 1) 전체 선대 gCO2e/ton.km Scope 1 Scope 2 Scope 1, 2 온실가스 집약도 지역기반 Scope 3 온실가스 배출량 Up stream Scope 3 상세 Down stream 온실가스 감축 성과 온실가스 집약도 감축률 (2008년 대비) 연도별 실적 분류 에너지 소비량 에너지 소비 재생 에너지 6,007,061 2.31 tCO2e 2,831,583 Category 1 제품 및 서비스 구매 tCO2e 10,294 Category 2 자본재 tCO2e 481,446 Category 3 연료 및 에너지 관련 활동 tCO2e 1,204,371 Category 4 업스트림 운송 및 유통 tCO2e 552,510 Category 5 폐기물 처리 tCO2e 45,279 Category 6 임직원 출장 tCO2e 889 Category 7 임직원 통근 tCO2e 1,241 Category 13 다운스트림 임대 자산 tCO2e 509,081 Category 15 투자 tCO2e 26,473 전체 선대 % 54.4 컨테이너 선대 % 68.4 1) 종속기업 중 Washington united terminals 의 Scope 2 배출량은 시장기반으로, 그 외 기업들은 지역기반으로 산정 지표 환경 투자 환경 일반 에너지 소비량 에너지 집약도 (매출액 기반) 단위 데이터 MWh 22,762,176 MWh/백만원 1.95 재생 에너지 비율 % 0.2 재생 에너지 구매량 MWh 37,293 재생 에너지 소비량 MWh 37,293 환경 투자 비용 백만원 213,011.9 기후변화 대응 투자금액 백만원 205,209.9 신규시설 신조 투자 기후변화 기존 선박 내 기후변화 대응 설비 대응투자 투자 분류 관리 시스템 구축 투자 백만원 193,531.0 백만원 11,227.0 백만원 451.9 % 100 % 98 육상전원공급장치 Los Angeles / Long Beach (AMP) 사용 비율 Oakland"}]};
+
+/* ---------- 채점 규칙 ---------- */
+var MASS = /\d[\d,\.]*\s*(?:톤|ton|tons|tonne|tonnes|kg|천\s?톤|만\s?톤|kt|Mt|t(?![a-z가-힣]))/i;
+var PCT = /\d+(?:\.\d+)?\s?%/;
+var TREND = /전년|대비|목표|감소|증가|추이|저감|YoY|감축/;
+var AIRW = /황산화물|SOx|Sox|SO2|SO₂|대기오염|대기\s?배출|질소산화물|NOx|Nox|미세먼지/;
+var ITEMS = [
+ {n:'SOx 배출량', kw:/황산화물|SOx|Sox|SO2|SO₂|sulfur\s?oxide/gi, num:MASS, need:/배출|emission|발생/i,
+  c:['언급 없음','저감 필요성·규제만 서술','배출량 수치 공개(연도·단위)','수치 + 추이·목표 + 검증']},
+ {n:'NOx·PM 배출량', kw:/질소산화물|NOx|Nox|NO2|미세먼지|PM\s?2\.5|PM\s?10|입자상\s?물질/gi, num:MASS, need:/배출|emission|발생/i,
+  c:['언급 없음','저감 노력 서술','배출량 수치 공개','수치 + 추이·목표 + 검증']},
+ {n:'연료 황함량·저유황유', kw:/저유황유|저황유|LSFO|VLSFO|ULSFO|황\s?함량|황\s?함유|유황분|sulphur|sulfur\s?content|규제유/gi, num:/0\.5\s?%|0\.1\s?%|\d+(?:\.\d+)?\s?%|\d[\d,\.]*\s?(?:톤|만\s?톤|ton|kl|㎘)/i, need:null,
+  c:['언급 없음','저유황유 사용 서술','황함량 기준·사용 비율 수치','수치 + 전환 시점·목표 + 검증']},
+ {n:'스크러버·대체연료', kw:/스크러버|scrubber|탈황|EGCS|LNG\s?(?:추진|이중연료|연료)|Dual\s?Fuel|이중연료|메탄올|암모니아\s?(?:추진|연료)|수소\s?(?:추진|연료)|바이오\s?연료|대체\s?연료/gi, num:/\d+\s?(?:척|대|기|ships|vessels)|\d+(?:\.\d+)?\s?%/i, need:null,
+  c:['언급 없음','도입 계획·의지 서술','설치·운항 척수·연료 비중 수치','수치 + 목표·연도별 추이']},
+ {n:'육상전원·저속운항', kw:/육상\s?전력|육상\s?전원|\bAMP\b|Alternative\s?Maritime\s?Power|cold\s?ironing|shore\s?power|저속\s?운항|\bVSR\b|그린\s?포트|Green\s?Port/gi, num:/\d+(?:\.\d+)?\s?%|\d+\s?(?:개소|기|회|척|곳|대|건)|\d[\d,\.]*\s?(?:MWh|kWh)/i, need:null,
+  c:['언급 없음','필요성 서술','시설 수·이용 횟수·비율 수치','수치 + 목표·성과 + 검증']},
+ {n:'감축 목표', kw:/감축\s?목표|감축\s?계획|저감\s?목표|넷\s?제로|Net[\s-]?Zero|탄소\s?중립|로드맵|Roadmap|SBTi|2030\s?년|2050\s?년|2035\s?년|2040\s?년/gi, num:PCT, need:null,
+  c:['언급 없음','정성적 목표만','정량 목표(기준·달성연도 불명확)','기준연도·달성연도·수치 모두 있음']},
+ {n:'제3자 검증', kw:/제3자\s?검증|제삼자|검증\s?의견|검증\s?성명|독립\s?검증|검증\s?기관|보증\s?(?:의견|보고)|assurance|verification\s?statement|ISAE|AA1000|검증을\s?(?:받|완료|실시)|검증\s?받/gi, num:null, need:null,
+  c:['언급 없음','전체 검증만·대기지표 불명확','대기오염 지표가 검증 범위','검증 범위·결과 문구 구체적']}
+];
+var SHORT=['SOx','NOx·PM','저유황유','스크러버','육상전원','감축 목표','제3자 검증'];
+var NUMS=['①','②','③','④','⑤','⑥','⑦'];
+
+function windowAround(t,idx,len){var a=Math.max(0,idx-170),b=Math.min(t.length,idx+len+270);return {a:a,b:b,w:t.slice(a,b)}}
+function scan(item,pages){
+  var hits=[];
+  pages.forEach(function(pg){
+    var t=pg.t,m,last=-9999;item.kw.lastIndex=0;
+    while((m=item.kw.exec(t))){
+      if(m[0].length===0){item.kw.lastIndex++;continue}
+      if(m.index-last<140)continue; last=m.index;
+      var W=windowAround(t,m.index,m[0].length);
+      hits.push({p:pg.p,idx:m.index,len:m[0].length,a:W.a,b:W.b,w:W.w,page:t,
+        hasNum:!!(item.num&&item.num.test(W.w)&&(!item.need||item.need.test(W.w))),hasTrend:TREND.test(W.w)});
+    }
+  });
+  return hits;
+}
+function score(pages){
+  var res=ITEMS.map(function(it){return {hits:scan(it,pages),s:0,why:''}});
+  // ⑦ 제3자 검증
+  var v=res[6],vs=0;
+  if(v.hits.length){vs=1;
+    var air=v.hits.filter(function(h){return AIRW.test(h.page)});
+    if(air.length){vs=2;
+      if(air.some(function(h){return /검증\s?범위|보증\s?수준|합리적|제한적|검증\s?의견|검증\s?결과|limited|reasonable/i.test(h.w)})) vs=3;}}
+  v.s=vs;
+  v.why=vs===0?'검증 관련 문구를 찾지 못했다':vs===1?'검증 문구는 있으나 같은 쪽에 대기오염 지표가 없다 (온실가스 검증일 수 있다)':vs===2?'검증 문구와 대기오염 지표가 같은 쪽에 있다':'검증 범위·결과 문구까지 확인된다';
+  for(var i=0;i<6;i++){
+    var r=res[i],h=r.hits,s=0;
+    if(i===5){
+      if(h.length){s=1;
+        if(h.some(function(x){return x.hasNum}))s=2;
+        if(h.some(function(x){return x.hasNum&&/20[3-5]\d/.test(x.w)&&/20[012]\d\s?년?\s?(?:대비|기준)|기준\s?연도|base\s?year|baseline/i.test(x.w)}))s=3;}
+      r.s=s;r.why=s===0?'감축 목표 관련 문구를 찾지 못했다':s===1?'목표 문구는 있으나 수치(%)가 가까이 없다':s===2?'수치가 있는 목표가 있으나 기준연도·달성연도가 함께 보이지 않는다':'기준연도·달성연도·수치가 함께 있는 목표가 있다';
+    }else{
+      var nNum=h.filter(function(x){return x.hasNum}).length;
+      if(h.length){s=1; if(nNum)s=2; if(h.some(function(x){return x.hasNum&&x.hasTrend})&&vs>=2)s=3;}
+      r.s=s;
+      r.why=s===0?'관련 키워드를 찾지 못했다':s===1?('키워드 '+h.length+'곳, 수치가 가까이 없어 서술로 본다'):s===2?('키워드 '+h.length+'곳 중 '+nNum+'곳에 수치가 있다. 추이·목표 또는 검증 근거는 부족하다'):('수치와 추이·목표가 있고 대기오염 지표 검증이 확인된다');
+    }
+  }
+  return res;
+}
+
+/* ---------- 상태 ---------- */
+var cur=null;           // {name,year,pages,res,ovr:[null...],example}
+var list=[];            // {name,year,sc:[7]}
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function finalScores(){return cur.res.map(function(r,i){return cur.ovr[i]==null?r.s:cur.ovr[i]})}
+function setStatus(msg,err){var s=$('status');s.textContent=msg||'';s.className='status'+(err?' err':'')}
+
+/* ---------- 그리기 ---------- */
+function radar(sc){
+  var W=380,H=270,cx=190,cy=135,R=84,n=7,pts=[],axes='',rings='',labs='';
+  function P(i,v){var a=-Math.PI/2+i*2*Math.PI/n;return [cx+R*v/3*Math.cos(a),cy+R*v/3*Math.sin(a)]}
+  for(var k=1;k<=3;k++){var ps=[];for(var i=0;i<n;i++)ps.push(P(i,k).join(','));rings+='<polygon points="'+ps.join(' ')+'" fill="none" stroke="var(--line)" stroke-width="1"/>'}
+  for(var i=0;i<n;i++){var e=P(i,3),l=P(i,3.62),a=-Math.PI/2+i*2*Math.PI/n,anc=Math.cos(a)>.3?'start':Math.cos(a)<-.3?'end':'middle';
+    axes+='<line x1="'+cx+'" y1="'+cy+'" x2="'+e[0]+'" y2="'+e[1]+'" stroke="var(--line)"/>';
+    labs+='<text x="'+l[0]+'" y="'+(l[1]+4)+'" text-anchor="'+anc+'" font-size="12" font-weight="700" fill="var(--muted)">'+NUMS[i]+' '+esc(SHORT[i])+'</text>';
+    pts.push(P(i,sc[i]).join(','))}
+  var dots=sc.map(function(v,i){var p=P(i,v);return '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="3.6" fill="var(--navy)"/>'}).join('');
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="항목별 점수 레이더 차트" style="max-width:380px;display:block;margin:0 auto">'+rings+axes+
+   '<polygon points="'+pts.join(' ')+'" fill="var(--teal)" fill-opacity=".28" stroke="var(--navy)" stroke-width="2.2" stroke-linejoin="round"/>'+dots+labs+'</svg>';
+}
+function snippet(h){
+  var t=h.page,a=h.a,b=h.b;
+  var pre=t.slice(a,h.idx),mid=t.slice(h.idx,h.idx+h.len),post=t.slice(h.idx+h.len,b);
+  return (a>0?'… ':'')+esc(pre)+'<mark>'+esc(mid)+'</mark>'+esc(post)+(b<t.length?' …':'');
+}
+function render(){
+  if(!cur)return;
+  var sc=finalScores(),tot=sc.reduce(function(a,b){return a+b},0);
+  $('rName').textContent=cur.name+(cur.year?' '+cur.year:'');
+  var tg=$('rTag');tg.textContent=cur.example?'예시 (발췌 7쪽)':(cur.pages.length+'쪽 분석');tg.className='tag'+(cur.example?' ex':'');
+  $('rTotal').textContent=tot;$('rBar').style.width=(tot/21*100)+'%';
+  $('rNote').textContent=cur.example?'HMM 2024 ESG Focus에서 발췌한 7쪽으로 만든 예시입니다. 요약본이라 본편 보고서와 점수가 다를 수 있습니다.':'자동 추정과 직접 확정한 점수가 섞여 있을 수 있습니다.';
+  $('radar').innerHTML=radar(sc);
+  var html='';
+  ITEMS.forEach(function(it,i){
+    var r=cur.res[i],fs=sc[i],ov=cur.ovr[i]!=null;
+    var meter='';for(var k=1;k<=3;k++)meter+='<i class="'+(k<=fs?'f'+fs:'')+'"></i>';
+    var hits=r.hits.slice().sort(function(a,b){return ((b.hasNum&&b.hasTrend?2:0)+(b.hasNum?1:0))-((a.hasNum&&a.hasTrend?2:0)+(a.hasNum?1:0))||a.p-b.p}).slice(0,3);
+    var pgs=[];r.hits.forEach(function(h){if(pgs.indexOf(h.p)<0)pgs.push(h.p)});
+    var crit='<div class="crit">'+it.c.map(function(c,k){return '<div class="'+(k===fs?'on':'')+'"><b>'+k+'점</b>'+esc(c)+'</div>'}).join('')+'</div>';
+    var ev=hits.length?hits.map(function(h){return '<p class="ev"><span class="pg">p.'+h.p+'</span>'+snippet(h)+(h.hasNum?'<span class="fl">수치</span>':'')+(h.hasTrend&&h.hasNum?'<span class="fl">추이·목표</span>':'')+'</p>'}).join(''):'<p class="none">근거로 삼을 문장을 찾지 못했다. 찾아본 키워드: '+esc(it.kw.source.replace(/\\s\?/g,'').replace(/\\b/g,'').slice(0,110))+' …</p>';
+    var opts=[0,1,2,3].map(function(k){return '<option value="'+k+'"'+(k===fs?' selected':'')+'>'+k+'점</option>'}).join('');
+    html+='<details class="it"'+(i===0?' open':'')+'><summary><div><h3>'+NUMS[i]+' '+esc(it.n)+'</h3><div class="meta">'+esc(r.why)+(pgs.length?' · 발견 쪽 '+pgs.slice(0,8).join(', ')+(pgs.length>8?' 외':''):'')+'</div></div><div class="sc"><div class="meter" aria-hidden="true">'+meter+'</div><span class="score">'+fs+'</span></div></summary>'+
+      '<div class="body">'+crit+ev+'<div class="ovr"><label for="ov'+i+'" style="margin:0">내가 확정한 점수</label><select id="ov'+i+'" data-i="'+i+'">'+opts+'</select>'+(ov?'<span class="tag">자동 추정 '+r.s+'점에서 변경</span>':'<span>자동 추정 '+r.s+'점</span>')+'</div></div></details>';
+  });
+  $('items').innerHTML=html;
+  Array.prototype.forEach.call($('items').querySelectorAll('select'),function(s){s.addEventListener('change',function(){
+    var i=+s.dataset.i,v=+s.value;cur.ovr[i]=(v===cur.res[i].s)?null:v;
+    var keep=Array.prototype.map.call($('items').querySelectorAll('details'),function(d){return d.open});
+    render();Array.prototype.forEach.call($('items').querySelectorAll('details'),function(d,k){d.open=keep[k]});
+  })});
+}
+function renderCmp(){
+  var box=$('cmp');
+  if(!list.length){box.innerHTML='<div class="empty">아직 담긴 보고서가 없습니다. 위 결과에서 비교표에 추가하거나 PDF를 여러 개 올려 보세요.</div>';$('cmpNote').textContent='';return}
+  var h='<div class="tw"><table><thead><tr><th>기관</th><th>연도</th>'+NUMS.map(function(n,i){return '<th title="'+esc(ITEMS[i].n)+'">'+n+'</th>'}).join('')+'<th>합계</th><th></th></tr></thead><tbody>';
+  list.forEach(function(r,ri){h+='<tr><td>'+esc(r.name)+'</td><td>'+(r.year||'')+'</td>'+r.sc.map(function(v){return '<td class="c'+v+'">'+v+'</td>'}).join('')+'<td class="sumc">'+r.sc.reduce(function(a,b){return a+b},0)+'</td><td><button type="button" class="rm" data-r="'+ri+'" aria-label="삭제">×</button></td></tr>'});
+  h+='</tbody></table></div>';box.innerHTML=h;
+  $('cmpNote').textContent='열 번호: '+NUMS.map(function(n,i){return n+' '+ITEMS[i].n}).join(' / ');
+  Array.prototype.forEach.call(box.querySelectorAll('.rm'),function(b){b.addEventListener('click',function(){list.splice(+b.dataset.r,1);renderCmp()})});
+}
+function renderRubric(){
+  var h='<table><thead><tr><th>항목</th><th>0점</th><th>1점</th><th>2점</th><th>3점</th></tr></thead><tbody>';
+  ITEMS.forEach(function(it,i){h+='<tr><td style="white-space:normal"><b>'+NUMS[i]+' '+esc(it.n)+'</b></td>'+it.c.map(function(c){return '<td style="white-space:normal;text-align:left">'+esc(c)+'</td>'}).join('')+'</tr>'});
+  $('rubric').innerHTML=h+'</tbody></table><p class="fine" style="margin-top:8px">연구팀 초안입니다. 1~3점 판정은 근거 문장이 키워드 근처에 있는지, 수치와 추이·목표 표현이 함께 있는지, 대기오염 지표가 검증 범위에 들어 있는지로 자동 추정합니다.</p>';
+}
+
+/* ---------- 분석 실행 ---------- */
+function analyze(name,year,pages,example){
+  cur={name:name||'이름 없음',year:year||'',pages:pages,res:score(pages),ovr:[null,null,null,null,null,null,null],example:!!example};
+  render();
+}
+function parseName(fn){
+  var b=fn.replace(/\.pdf$/i,'').replace(/^[0-9a-f]{8}-/,'').replace(/[_\-\s]*보고서$/,'').replace(/_?report$/i,'');
+  var m=b.match(/^(.*?)[_\-\s]+((?:19|20)\d\d)(?:\D.*)?$/);
+  return m?{name:m[1].trim()||b,year:m[2]}:{name:b,year:''};
+}
+async function readPdf(file,onProg){
+  var buf=await file.arrayBuffer();
+  var task=pdfjsLib.getDocument({data:new Uint8Array(buf)});
+  var pdf=await task.promise,pages=[],chars=0;
+  for(var p=1;p<=pdf.numPages;p++){
+    var pg=await pdf.getPage(p),tc=await pg.getTextContent(),s='';
+    tc.items.forEach(function(it){s+=it.str+(it.hasEOL?' ':' ')});
+    s=s.replace(/\s+/g,' ').trim();chars+=s.length;pages.push({p:p,t:s});
+    if(onProg&&(p%5===0||p===pdf.numPages))onProg(p,pdf.numPages);
+  }
+  return {pages:pages,chars:chars};
+}
+function addToList(r){list.push({name:r.name,year:r.year,sc:r.sc});renderCmp()}
+async function handleFiles(files){
+  files=Array.prototype.filter.call(files,function(f){return /\.pdf$/i.test(f.name)||f.type==='application/pdf'});
+  if(!files.length){setStatus('PDF 파일만 올릴 수 있습니다.',true);return}
+  if(typeof pdfjsLib==='undefined'){setStatus('PDF 읽기 도구를 불러오지 못했습니다. 아래 텍스트 붙여넣기를 사용해 주세요.',true);return}
+  try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'}catch(e){}
+  var typedName=$('orgName').value.trim(),typedYear=$('orgYear').value.trim();
+  for(var k=0;k<files.length;k++){
+    var f=files[k],info=parseName(f.name);
+    if(files.length===1&&typedName&&!(/^(HMM)$/.test(typedName)&&info.name)){info.name=typedName;if(typedYear)info.year=info.year||typedYear}
+    setStatus('('+(k+1)+'/'+files.length+') '+f.name+' 읽는 중…');
+    try{
+      var out=await readPdf(f,function(p,n){setStatus('('+(k+1)+'/'+files.length+') '+f.name+' — '+p+'/'+n+'쪽')});
+      if(out.chars<300*Math.max(1,out.pages.length/10)){setStatus(f.name+': 글자를 거의 읽지 못했습니다. 스캔본이거나 글꼴 문제일 수 있어 텍스트 붙여넣기를 권합니다.',true);continue}
+      analyze(info.name,info.year,out.pages,false);
+      $('orgName').value=info.name;if(info.year)$('orgYear').value=info.year;
+      if(files.length>1)addToList({name:info.name,year:info.year,sc:finalScores()});
+      setStatus(f.name+' 점검 완료 ('+out.pages.length+'쪽)');
+    }catch(e){setStatus(f.name+': 읽는 중 오류가 났습니다. '+(e&&e.message?e.message:''),true)}
+  }
+  if(files.length>1)setStatus(files.length+'개 파일 점검 완료. 비교표에 담았습니다.');
+}
+function loadSample(){
+  if(!SAMPLE)return;
+  $('orgName').value=SAMPLE.name;$('orgYear').value=SAMPLE.year;
+  analyze(SAMPLE.name,SAMPLE.year,SAMPLE.pages,true);setStatus('');
+}
+function runPaste(){
+  var t=$('paste').value.trim();
+  if(t.length<50){setStatus('붙여넣은 글이 너무 짧습니다.',true);return}
+  var parts=t.split(/^\s*={3,}\s*$/m).map(function(x){return x.replace(/\s+/g,' ').trim()}).filter(Boolean);
+  var pages=parts.map(function(s,i){return {p:i+1,t:s}});
+  analyze($('orgName').value.trim()||'붙여넣기',$('orgYear').value.trim(),pages,false);
+  setStatus('붙여넣은 글 '+pages.length+'구간 점검 완료. 쪽 번호는 구분선 순서입니다.');
+}
+function copyText(txt,done){
+  function fb(){var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done(true)}catch(e){done(false)}document.body.removeChild(ta)}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){done(true)},fb)}else fb();
+}
+
+/* ---------- 이벤트 ---------- */
+var drop=$('drop'),fileEl=$('file');
+drop.addEventListener('click',function(){fileEl.click()});
+drop.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();fileEl.click()}});
+fileEl.addEventListener('change',function(){if(fileEl.files.length)handleFiles(fileEl.files);fileEl.value=''});
+['dragenter','dragover'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.add('on')})});
+['dragleave','drop'].forEach(function(ev){drop.addEventListener(ev,function(e){e.preventDefault();drop.classList.remove('on')})});
+drop.addEventListener('drop',function(e){if(e.dataTransfer&&e.dataTransfer.files.length)handleFiles(e.dataTransfer.files)});
+$('runPaste').addEventListener('click',runPaste);
+$('loadSample').addEventListener('click',loadSample);
+$('addList').addEventListener('click',function(){
+  if(!cur)return;
+  var nm=$('orgName').value.trim()||cur.name,yr=$('orgYear').value.trim()||cur.year;
+  cur.name=nm;cur.year=yr;addToList({name:nm,year:yr,sc:finalScores()});render();setStatus(nm+' '+yr+' 을(를) 비교표에 담았습니다.');
+});
+$('clearList').addEventListener('click',function(){list=[];renderCmp()});
+$('copyTsv').addEventListener('click',function(){
+  if(!list.length){setStatus('복사할 표가 비어 있습니다.',true);return}
+  var rows=[['기관','연도'].concat(ITEMS.map(function(it,i){return NUMS[i]+' '+it.n}),['합계']).join('\t')];
+  list.forEach(function(r){rows.push([r.name,r.year].concat(r.sc,[r.sc.reduce(function(a,b){return a+b},0)]).join('\t'))});
+  copyText(rows.join('\n'),function(ok){setStatus(ok?'표를 복사했습니다. 엑셀에 붙여 넣으세요.':'복사가 막혀 있습니다. 표를 직접 선택해 복사해 주세요.',!ok)});
+});
+
+$('mergeBtn').addEventListener('click',function(){
+  if(!cur)return;
+  var nm=$('orgName').value.trim()||cur.name,yr=parseInt($('orgYear').value,10)||parseInt(cur.year,10);
+  if(!yr){setStatus('연도(실적연도)를 숫자로 입력해 주세요.',true);return}
+  var sc=finalScores();
+  var it=cur.res.map(function(r,i){
+    var h=r.hits&&(r.hits.filter(function(x){return x.hasNum})[0]||r.hits[0]);
+    return {s:sc[i],e:h?h.w:'',p:h&&h.p!=null?'쪽 '+h.p:'',o:cur.ovr[i]==null?null:r.s,w:r.why};
+  });
+  var ok=window.ESG_ADD&&window.ESG_ADD({o:nm,y:yr,g:$('mgGrp').value,by:'직접 입력',it:it,m:(cur.example?'예시 PDF 발췌 기준입니다. ':'')+'점검 도구로 추정한 뒤 사람이 확정한 값입니다.'});
+  if(!ok)setStatus('결과 화면을 불러오지 못했습니다.',true);
+});
+renderRubric();renderCmp();loadSample();
+})();
+</script>
+
+<script>
+var RESULTS=[{"o": "HMM", "y": 2018, "g": "선사", "by": "연구팀", "it": [{"s": 1, "e": "“현대상선은 온실가스뿐만 아니라 NOx, SOx, 미세먼지 등도 같이 관리하여 대기 오염물질에 대한 배출현황을 상시적이고 체계적으로 모니터링하며”", "p": "인쇄 48-49 / PDF 25", "o": null, "w": null}, {"s": 1, "e": "“연료분사밸브를 Sliding Type으로 변경하고 엔진 제어장치를 설치하여 연소효율을 증가시키는 등의 노력을 펼치고 있습니다. 일부 신조선의 경우에는 NOx를 획기적으로 제거하는 SCR이 탑재되었습니다.”", "p": "인쇄 52-53 / PDF 27", "o": null, "w": null}, {"s": 1, "e": "“전 세계 모든 해역에서 운항하는 선박은 연료유에 포함된 황산화물 함유량을 현행 3.5%에서 0.5% 이하로 낮춰야 합니다.”", "p": "인쇄 52-53 / PDF 27", "o": null, "w": null}, {"s": 3, "e": "“2018년 신조 11,000TEU 2척에 … 스크러버를 설치 완료하였으며” / “2020년 2분기부터 초대형 컨테이너선 20척을 순차적으로 인도받으며, 이 선박들은 모두 … 스크러버를 설치할 계획입니다.”", "p": "인쇄 52-53 / PDF 27", "o": null, "w": null}, {"s": 2, "e": "“현대상선은 100% 육상전원 공급장치(Alternative Marine Power, AMP)를 사용하여 대기오염물질 저감을 통한 지역 환경 보호에 기여한 점을 인정받아 2019년 1월에 미국 오클랜드항으로부터 ‘친환경 우수선사’로 선정되었습니다.”", "p": "인쇄 50-51 / PDF 26", "o": null, "w": null}, {"s": 2, "e": "“2030년 단위화물당 탄소배출량 ‘08년 대비 70% 감축(컨테이너선 대상), 2050년 탄소 배출 제로(Carbon Neutral)를 달성할 수 있을 것이라 생각합니다.”", "p": "인쇄 52-53 / PDF 27", "o": 3, "w": "온실가스 목표만 있어 ⑥ 최대 2점"}, {"s": 3, "e": "“배출(Emissions): 305-1, 305-2, 305-3, 305-5, 305-6, 305-7” / “검증 범위에 포함된 상기 데이터가 적정하게 기술되지 않았다는 증거는 발견되지 않았습니다.”", "p": "인쇄 104-105 / PDF 53", "o": null, "w": null}], "m": "현대상선 2019 지속가능경영보고서(2019.10 검증), 실적연도 2018. ①②는 SOx·NOx 배출량 수치를 보고서 전체에서 찾지 못함(GRI 305-7이 가리키는 52-53쪽도 서술형). ③은 규제 기준 설명만 있고 회사의 사용 비율·물량 없음. ⑥은 온실가스 목표만 있음. ⑦은 한국경영인증원 AA1000AS Type2 Moderate, 검증 범위에 305-7 포함.현대상선 2019 지속가능경영보고서(2019.10 검증), 실적연도 2018. ①②는 SOx·NOx 배출량 수치를 보고서 전체에서 찾지 못함(GRI 305-7이 가리키는 52-53쪽도 서술형). ③은 규제 기준 설명만 있고 회사의 사용 비율·물량 없음. ⑥은 온실가스 목표만 있음. ⑦은 한국경영인증원 AA1000AS Type2 Moderate, 검증 범위에 305-7 포함. [기준 적용 2026-11-12: ⑥ 3→2점]"}, {"o": "팬오션", "y": 2021, "g": "선사", "by": "연구팀", "it": [{"s": 3, "e": "“SOx (황산화물) Kg 6,895,430 7,511,958 8,438,785” (2019~2021년 표)", "p": "83", "o": 2, "w": "3개년 표(2019~2021)와 GRI 305 검증 범위 → 추이 인정, 3점"}, {"s": 3, "e": "“NOx (질소산화물) Kg 58,611,154 63,851,643 71,729,675” (2019~2021년 표)", "p": "83", "o": 2, "w": "3개년 표와 GRI 305 검증 범위 → 추이 인정, 3점"}, {"s": 2, "e": "“팬오션은 2020년 1월부터 황 함유량이 0.5%미만인 저유황유를 주 연료유로 보급하고 있습니다.”", "p": "36", "o": null, "w": null}, {"s": 2, "e": "“팬오션은 보유 선대 중 가장 많은 연료를 사용하는 케이프사이즈 이상 선박의 74%에 스크러버 설치를 완료하였습니다.”", "p": "36", "o": null, "w": null}, {"s": 2, "e": "“정박 중 선박의 미세먼지 감축을 위해 2척의 선박에 육상전원공급장치(AMP, Alternative Maritime Power)를 탑재하고 있습니다.”", "p": "36", "o": null, "w": null}, {"s": 2, "e": "“해당 시스템을 통해 선박에서 대기로 배출되는 황산화물 포함량을 실시간으로 모니터링하며 절차서에 따라 관리함으로써 황산화물 배출량을 줄이고자 노력합니다.”", "p": "36", "o": 1, "w": "대기오염 목표는 정성이나 온실가스 정량 목표(기준 2021·달성 2030·10.4%)가 있어 2점(온실가스만 있으면 최대 2점)"}, {"s": 2, "e": "“ㆍGRI 305: 배출(Emissions)” (검증 범위 목록)", "p": "100", "o": null, "w": null}], "m": "실적연도 2021(보고기간 2021.01.01~2021.12.31), 2022년 발간 보고서, 총 104쪽. ①·②는 3개년 표와 GRI 305 검증 범위가 있으나 전년·목표 대비 설명이 없어 2점. ② PM10은 83쪽 표 2,364,412 kg(2021)과 97쪽 SASB 5,352 t가 상이함. ③은 황함량 0.5% 기준 및 2020년 1월 전환 시점은 있으나 사용 비율·물량이 없어 2점. ⑥은 대기오염 감축 목표가 정성 서술뿐이므로 1점 적용(온실가스 목표: 기준연도 2021, 달성연도 2030, 10.4% 감축을 인정하면 3점으로 변경 가능). ⑦은 GRI 305 전체가 검증 범위이나 305-7 단독 명시는 없어 2점.실적연도 2021(보고기간 2021.01.01~2021.12.31), 2022년 발간 보고서, 총 104쪽. ①·②는 3개년 표와 GRI 305 검증 범위가 있으나 전년·목표 대비 설명이 없어 2점. ② PM10은 83쪽 표 2,364,412 kg(2021)과 97쪽 SASB 5,352 t가 상이함. ③은 황함량 0.5% 기준 및 2020년 1월 전환 시점은 있으나 사용 비율·물량이 없어 2점. ⑥은 대기오염 감축 목표가 정성 서술뿐이므로 1점 적용(온실가스 목표: 기준연도 2021, 달성연도 2030, 10.4% 감축을 인정하면 3점으로 변경 가능). ⑦은 GRI 305 전체가 검증 범위이나 305-7 단독 명시는 없어 2점. [기준 적용 2026-11-12: ① 2→3점, ② 2→3점, ⑥ 1→2점] [확인 필요] ⑦ 검증의견서에 검증 수준·결론 문구가 있으면 3점."}, {"o": "팬오션", "y": 2022, "g": "선사", "by": "연구팀", "it": [{"s": 3, "e": "“SOx(황산화물) kg 7,511,958 8,438,785 8,382,249” (2020~2022년 표)", "p": "88", "o": null, "w": null}, {"s": 3, "e": "“NOx(질소산화물) kg 63,851,643 71,729,675 71,249,120” (2020~2022년 표)", "p": "88", "o": null, "w": null}, {"s": 2, "e": "“팬오션은 2020년 1월부터 황 함유량이 0.5% 미만인 저유황유를 주 연료유로 보급하고 있습니다.”", "p": "29", "o": null, "w": null}, {"s": 2, "e": "“팬오션은 보유 선대 중 가장 많은 연료를 사용하는 케이프사이즈 이상 선박의 76%에 스크러버 설치를 완료하였습니다.”", "p": "29", "o": null, "w": null}, {"s": 2, "e": "“정박 중 선박의 미세먼지 감축을 위해 2척의 선박에 육상전원공급장치(AMP, Alternative Maritime Power)를 탑재하고 있습니다.”", "p": "29", "o": null, "w": null}, {"s": 3, "e": "“’21년 대비 ’30년 SOx, NOx 배출량 12% 감축”", "p": "25", "o": null, "w": null}, {"s": 2, "e": "“ㆍGRI 305: 배출(Emissions)” (검증 범위 목록)", "p": "105", "o": null, "w": null}], "m": "실적연도 2022(보고기간 2022.01.01~2022.12.31), 2023년 발간 보고서, 총 109쪽. ①·②는 3개년 실적표(88쪽), 2023년 목표 SOx 8,043 ton·NOx 68,418 ton(28쪽), GRI 305 검증 범위를 근거로 3점. ② PM10은 데이터표에 없고 102쪽 SASB에 5,317 t 한 해 수치만 있어 항목 내 최고 근거(NOₓ)를 적용. ④ 스크러버 76% 수치는 있으나 연도별 추이·척수 목표가 없어 2점(SCR 1척은 28쪽). ⑤ AMP 2척 및 저속운항 목표 90%·실적 87%(28쪽)는 있으나 저감량이 없어 2점. ⑥은 기준연도·달성연도·감축률이 모두 명시됨. ⑦은 GRI 305 전체 검증 범위이나 305-7 단독 명시는 없어 2점. [확인 필요] ⑦ 검증의견서에 검증 수준·결론 문구가 있으면 3점."}, {"o": "팬오션", "y": 2023, "g": "선사", "by": "연구팀", "it": [{"s": 3, "e": "“SOx 발생량 8,042,747 kg 8,337,383 kg” (2023년 목표·실적 표)", "p": "34", "o": null, "w": null}, {"s": 3, "e": "“NOx 발생량 68,417,927 kg 70,867,753 kg” (2023년 목표·실적 표)", "p": "34", "o": null, "w": null}, {"s": 2, "e": "“국제해사기구(IMO) 2020 황산화물 규제에 따라 팬오션은 황함유량이 낮은 저유황 연료유(0.5% 이하)를 사용하고 있으며 일부 선박은 황산화물(SOx) 저감장치(Scrubber)를 설치하여 규제를 준수하고 있습니다.”", "p": "40", "o": null, "w": null}, {"s": 3, "e": "“메탄올/암모니아 추진선 또는 CCUS 설치 선박 등 2030년까지 총 6척 도입 계획”", "p": "31", "o": null, "w": null}, {"s": 1, "e": "“또한, 미세먼지 저감을 위해 인천항 선박 저속운항 프로그램(VSR)에 참여하는 등 대기오염물질 배출 저감을 위하여 다양한 방안을 검토/활용하고 있습니다.”", "p": "40", "o": null, "w": null}, {"s": 3, "e": "“’21년 대비 ’30년 SOx, NOx 배출량 12% 감축”", "p": "33", "o": null, "w": null}, {"s": 2, "e": "“GRI 305 : 배출(Emissions)” (검증 범위 목록)", "p": "116", "o": null, "w": null}], "m": "실적연도 2023(보고기간 2023.01.01~2023.12.31), 2024년 발간 보고서, 총 120쪽(118~119쪽은 텍스트가 없어 뒤표지 추정으로 제외). ①·②는 2023년 목표 대비 실적을 같은 표(34쪽)에서 비교 가능. ② PM10은 112쪽 SASB에 5,301 t 한 해 수치만 있음. ③은 0.5% 이하·IMO 2020 기준은 있으나 사용 비율·물량이 없어 2점; 2022년 대비 SOx 44,866 kg 감소(40쪽)는 저유황유와 스크러버 합산 효과임. ④는 스크러버 설치 척수·비율은 '일부 선박'으로만 표현됐으나, 2030년 대체연료/CCUS 선박 6척 도입 계획(31쪽), SCR/EGR 6척 설치 목표(34쪽), 저감장치 투자금액(94쪽)을 종합해 3점(스크러버만 보면 2점). ⑤는 기존 AMP 2척 수치가 사라지고 VSR 참여 서술만 있어 1점; 육상전원 공급설비 투자금액 573백만원(2021, 37쪽)을 수치로 인정하면 2점. ⑦은 GRI 305 전체 검증 범위이나 305-7 단독 명시는 없어 2점. [확인 필요] ⑦ 검증의견서에 검증 수준·결론 문구가 있으면 3점. ⑤는 AMP 2척 문장이 이 보고서에 실제로 없는지 재확인."}, {"o": "울산항만공사", "y": 2017, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "exhausts comprised of sulfur oxides (SOx), nitrogen oxide (NOx), carbon dioxide(CO2) and ballaster water, etc, from 2020", "p": "21 / 23", "o": null, "w": null}, {"s": 1, "e": "Fine dust (PM10) 46.83 43.33 44.75 ㎍/㎥", "p": "31 / 33", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드 저유황유, LSFO, 규제유, 해당 문장 없음", "p": "- / -", "o": null, "w": null}, {"s": 1, "e": "Ulsan Port Authority also selected bunkering infrastructure establishment for LNG fuel that is emerging as the responding measures to relevant regulation, as the future growth engine project for Ulsan port, and preparation is underway.", "p": "21 / 23", "o": null, "w": null}, {"s": 2, "e": "Ulsan Port Authority commenced work on installing 5 AMPs within main port pier 1 and 2 in dual use as harbor crane in 2017.", "p": "32 / 34", "o": null, "w": null}, {"s": 1, "e": "The mid to long term plan for developing Ulsan port into a green port aims to respond to air and water contamination issues, reduce greenhouse gas, and realize a low carbon green port.", "p": "31 / 33", "o": null, "w": null}, {"s": 3, "e": "Topic-specific standard The verifier verified the items disclosed in detail on the material topic derived through decision-making process on the items to be disclosed, and verified the following items to be disclosed Environment 305-2, 305-7", "p": "48 / 50", "o": null, "w": null}], "m": "영문 보고서 기준 평가. 다년 추이가 공개되었으나 대기오염물질 단위가 농도(㎍/㎥) 및 단순 나열이므로 지침에 따라 ①, ②는 1점을 부여함. ⑦제3자 검증은 검증 범위에 305-7 명시 및 검증 수준과 결론 문구가 모두 있어 3점을 부여함. [확인 필요] ②의 PM10 수치(44.75 등)가 배출량인지 농도인지 단위 확인(농도면 1점). ⑦은 검증의견서에 검증 수준·결론 문구가 있으면 3점."}, {"o": "울산항만공사", "y": 2019, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "SO2 (0.011 -> 0.01) through strengthening ecofriendly ship (ESI) incentive system", "p": "13 / 15", "o": null, "w": null}, {"s": 1, "e": "NO2 (0.025 -> 0.023) through strengthening ecofriendly ship (ESI) incentive system", "p": "13 / 15", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드 저유황유, LSFO, 규제유, 해당 문장 없음", "p": "- / -", "o": null, "w": null}, {"s": 1, "e": "Built and activated the infrastructure for leading LNG propulsion ships and bunkering", "p": "13 / 15", "o": null, "w": null}, {"s": 2, "e": "100% installation of low voltage AMP(onshore power supply facility) for government ships and tugboats(at 34 locations)", "p": "13 / 15", "o": null, "w": null}, {"s": 1, "e": "Reduce fine dust in port area", "p": "32 / 34", "o": null, "w": null}, {"s": 1, "e": "Social and environmental verification policy/operationally generated information is adequately described", "p": "47 / 49", "o": null, "w": null}], "m": "대기오염물질 수치가 농도 단위로 기재되어 지침에 따라 ①, ②는 1점 부여함. ⑦제3자 검증은 GRI 305-7 지표가 명시되지 않아 1점으로 처리함."}, {"o": "울산항만공사", "y": 2021, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "Reduction of 2,599 tons of air pollutants (SOx)", "p": "19 / 21", "o": null, "w": null}, {"s": 1, "e": "Reduction of 9,128 tons of air pollutants such as fine dust", "p": "19 / 21", "o": null, "w": null}, {"s": 1, "e": "Prohibited use of fuel oil with a sulfur content of 0.5% or more", "p": "19 / 21", "o": null, "w": null}, {"s": 2, "e": "Increased demand for LNG bunkering by expanding the introduction of LNG-powered vessels (2 vessels at Ulsan Port)", "p": "18 / 20", "o": null, "w": null}, {"s": 2, "e": "1,558 Incoming ships participate in low-speed operation", "p": "19 / 21", "o": null, "w": null}, {"s": 3, "e": "Air Pollutants 2018 35.0, 2021 Goal (Reduction Rate) 12.1 (34.5%)", "p": "22 / 24", "o": null, "w": null}, {"s": 1, "e": "Environment and Social verifying whether information generated by policies and operation were presented appropriately in the report.", "p": "55 / 57", "o": null, "w": null}], "m": "대기오염물질 배출이 총배출량 없이 저감량(Reduction) 수치만 표기되어 지침에 따라 ①, ② 항목 1점 부여함. ③저유황유는 규제 기준(0.5%) 설명만 있어 1점을 부여함. ⑥감축 목표는 대기오염물질에 대한 기준연도(2018), 달성연도(2021), 수치(35.0에서 12.1)가 모두 명시되어 3점 부여함."}, {"o": "대한해운", "y": 2020, "g": "선사", "by": "연구팀", "it": [{"s": 2, "e": "SOx 배출량 (사선/BBCHP/BBC 기준) 2019 22,122 Ton, 2020 18,870 Ton", "p": "69 / 70", "o": 3, "w": "검증보고서 없음(⑦ 0점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "NOx 배출량 34,963 Ton, PM 배출량 1,010 Ton", "p": "69 / 70", "o": 3, "w": "검증보고서 없음(⑦ 0점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "32척의 선박에서 황 함유량 0.5% 미만의 저유황유를 사용하고 있으며", "p": "33 / 34", "o": null, "w": null}, {"s": 2, "e": "8척의 신조 선박에 스크러버(황산화물 배출 저감장치)를 설치하였고, 기존 운항선 2척의 경우 약 90억원의 예산을 배정하여 스크러버 설치를 완료하였습니다.", "p": "33 / 34", "o": null, "w": null}, {"s": 2, "e": "대한해운 벌크선 9척에 대한 EPL 엔진출력제한작업을 완료", "p": "32 / 33", "o": null, "w": null}, {"s": 2, "e": "2021년 배출량 대비 4.3% 감축 목표, 단계적 감축 계획", "p": "21 / 22", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드 제3자 검증, 검증, 해당 내용 없음", "p": "- / -", "o": null, "w": null}], "m": "다년 표를 통해 배출량 추이를 공개하여 ①, ②는 3점을 부여함. ⑥대기오염물질 감축 목표 수치 없이 온실가스 감축 목표만 제시되어 지침에 따라 2점으로 처리함. ⑦제3자 검증보고서가 수록되어 있지 않아 0점으로 처리함.다년 표를 통해 배출량 추이를 공개하여 ①, ②는 3점을 부여함. ⑥대기오염물질 감축 목표 수치 없이 온실가스 감축 목표만 제시되어 지침에 따라 2점으로 처리함. ⑦제3자 검증보고서가 수록되어 있지 않아 0점으로 처리함. [기준 적용 2026-11-12: ① 3→2점, ② 3→2점]"}, {"o": "대한해운", "y": 2021, "g": "선사", "by": "연구팀", "it": [{"s": 2, "e": "SOx 배출량 (사선/BBCHP/BBC 기준) 2020 18,870 Ton, 2021 19,608 Ton", "p": "73 / 74", "o": 3, "w": "검증 범위에 대기오염 지표 없음(⑦ 1점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "NOx 배출량 39,376 Ton, PM 배출량 1,137 Ton", "p": "73 / 74", "o": 3, "w": "검증 범위에 대기오염 지표 없음(⑦ 1점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "32척의 선박에서 황 함유량 0.5% 미만의 저유황유를 사용하고 있으며", "p": "30 / 31", "o": null, "w": null}, {"s": 2, "e": "8척의 신조 선박에 스크러버(황산화물 배출 저감장치)를 설치하였고, 기존 운항선 2척에도 스크러버 설치를 완료하였습니다.", "p": "30 / 31", "o": null, "w": null}, {"s": 2, "e": "선박 20척에 예산 80만불을 투입하여 축출력제한설비 (SHaPoLi)를 설치하여 대응하고 있습니다.", "p": "29 / 30", "o": null, "w": null}, {"s": 2, "e": "2022년도 온실가스 배출량 대비 2030년도 30%, 2040년도 70% 감축 목표 수립", "p": "28 / 29", "o": null, "w": null}, {"s": 1, "e": "Environmental and Social: verifying whether information generated by policies and operation were presented appropriately in the report.", "p": "108 / 109", "o": null, "w": null}], "m": "다년 표를 통해 총배출량 추이를 공개하여 ①, ②는 3점을 부여함. ⑦제3자 검증보고서에 대기오염 지표가 명확한 검증 범위로 적시되어 있지 않아 지침에 따라 1점으로 처리함.다년 표를 통해 총배출량 추이를 공개하여 ①, ②는 3점을 부여함. ⑦제3자 검증보고서에 대기오염 지표가 명확한 검증 범위로 적시되어 있지 않아 지침에 따라 1점으로 처리함. [기준 적용 2026-11-12: ① 3→2점, ② 3→2점]"}, {"o": "대한해운", "y": 2022, "g": "선사", "by": "연구팀", "it": [{"s": 2, "e": "SOx 배출량 (사선/BBCHP/BBC 기준) 2021 19,608 Ton, 2022 20,534 Ton", "p": "60 / 61", "o": 3, "w": "검증보고서 없음(⑦ 0점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "NOx 배출량 41,235 Ton, PM 배출량 1,191 Ton", "p": "60 / 61", "o": 3, "w": "검증보고서 없음(⑦ 0점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "32척의 선박에서 황 함유량 0.5% 미만의 저유황유를 사용하고 있으며", "p": "29 / 30", "o": null, "w": null}, {"s": 2, "e": "2020년 8척의 신조 선박에 스크러버를 설치하였고, 기존 운항선 2척에도 스크러버 설치를 완료하였습니다. 또한, 2023년 기존 케이프사이즈 벌크 운항선 1척에 탈황장치를 설치", "p": "29 / 30", "o": null, "w": null}, {"s": 2, "e": "선박 20척에 예산 80만불을 투입하여 축출력제한설비 (SHaPoLi)를 설치하여 대응하고 있습니다.", "p": "28 / 29", "o": null, "w": null}, {"s": 2, "e": "2022년도 온실가스 배출량(1,555,874tCO2eq) 대비 2030년도 30%, 2040년도 70% 감축 목표 수립", "p": "27 / 28", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드 제3자 검증, 검증, 해당 내용 없음", "p": "- / -", "o": null, "w": null}], "m": "다년 표를 통해 배출량 질량 단위 수치와 추이를 공개하여 ①, ②는 3점을 부여함. ⑥대기오염물질 감축 목표가 아닌 온실가스 감축 목표만 제시되어 최대 2점을 부여함. ⑦제3자 검증보고서가 수록되어 있지 않아 0점으로 처리함.다년 표를 통해 배출량 질량 단위 수치와 추이를 공개하여 ①, ②는 3점을 부여함. ⑥대기오염물질 감축 목표가 아닌 온실가스 감축 목표만 제시되어 최대 2점을 부여함. ⑦제3자 검증보고서가 수록되어 있지 않아 0점으로 처리함. [기준 적용 2026-11-12: ① 3→2점, ② 3→2점]"}, {"o": "대한해운", "y": 2023, "g": "선사", "by": "연구팀", "it": [{"s": 2, "e": "SOx 배출량 (사선/BBCHP/BBC 기준) 2022 20,534 TON, 2023 18,463 TON", "p": "60 / 61", "o": 3, "w": "검증 범위에 대기오염 지표 없음(⑦ 1점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "NOx 배출량 38,510 TON, PM 배출량 1,112 TON", "p": "60 / 61", "o": 3, "w": "검증 범위에 대기오염 지표 없음(⑦ 1점): 3점 조건인 검증 범위 포함을 충족하지 못해 2점"}, {"s": 2, "e": "28척의 선박에서 황 함유량 0.5% 미만의 저유황유를 사용하고 있습니다.", "p": "49 / 50", "o": null, "w": null}, {"s": 2, "e": "2024년에는 1척의 운항 선박에 스크러버(황산화물 배출 저감장치)를 신규 설치하여, 현재 총 10척의 선박에 스크러버를 도입하였습니다.", "p": "49 / 50", "o": null, "w": null}, {"s": 2, "e": "축 출력 제한 설비(SHaPoLi, Shaft Power Limitation) 기존 선박 20척에 총 96만 달러를 투자하여 설치하였습니다.", "p": "47 / 48", "o": null, "w": null}, {"s": 2, "e": "2022년도 온실가스 배출량(1,555,874tCO2eq) 대비 2030년도 30%, 2040년도 70% 감축 목표 수립", "p": "27 / 28", "o": null, "w": null}, {"s": 1, "e": "검증 범위 지속가능경영보고서 내 환경, 사회 및 지배구조(ESG) 활동 및 성과 데이터", "p": "111 / 112", "o": null, "w": null}], "m": "다년 표를 통해 총배출량 추이를 공개하여 ①, ②는 3점을 부여함. ⑦제3자 검증보고서가 있으나 대기오염 지표가 명확한 검증 범위로 명시되어 있지 않아 1점을 부여함.다년 표를 통해 총배출량 추이를 공개하여 ①, ②는 3점을 부여함. ⑦제3자 검증보고서가 있으나 대기오염 지표가 명확한 검증 범위로 명시되어 있지 않아 1점을 부여함. [기준 적용 2026-11-12: ① 3→2점, ② 3→2점]"}, {"o": "여수광양항만공사", "y": 2020, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "미세먼지 33.7톤 저감", "p": "22 / 23", "o": null, "w": null}, {"s": 1, "e": "미세먼지 33.7톤 저감", "p": "22 / 23", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드 저유황유, 황 함유량, 황산화물 등, 해당 문장 없음", "p": "- / -", "o": null, "w": null}, {"s": 2, "e": "수소 컨 트레일러 실증사업 추진을 위한 현대자동차 MOU 체결 수소 컨 트레일러 12대 운영", "p": "37 / 38", "o": null, "w": null}, {"s": 2, "e": "선박저속운항프로그램 도입 대상선박 7,408척 중 2,206척 참여", "p": "36 / 37", "o": null, "w": null}, {"s": 3, "e": "제1차 항만 대기질 관리 개선 계획 2025년까지 2017년 대비 초미세먼지 60% 절감", "p": "36 / 37", "o": null, "w": null}, {"s": 1, "e": "Emissions 305-1, 305-2", "p": "87 / 88", "o": null, "w": null}], "m": "대기오염물질 저감량만 공개하여 ①, ②는 1점 부여함. ⑥감축 목표는 초미세먼지에 대한 기준연도(2017), 달성연도(2025), 수치(60%)가 모두 명시되어 3점 부여함. ⑦제3자 검증보고서에 대기오염 지표(GRI 305-7)가 명시되지 않아 1점으로 처리함."}, {"o": "여수광양항만공사", "y": 2021, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "미세먼지 연간 4천 톤 저감(T/C), 5톤(Y/T) 저감효과", "p": "36 / 37", "o": null, "w": null}, {"s": 1, "e": "미세먼지 연간 4천 톤 저감(T/C), 5톤(Y/T) 저감효과", "p": "36 / 37", "o": null, "w": null}, {"s": 1, "e": "항만지역 등 대기질 개선에 관한 특별법 제정 대기오염물질 배출량 저감을 위한 정책방향과 추진과제를 제시", "p": "27 / 28", "o": null, "w": null}, {"s": 2, "e": "국내 최초 수소 Y/T 개발 및 도입 23년 20대 전환", "p": "36 / 37", "o": null, "w": null}, {"s": 2, "e": "선박 저속 운항 프로그램 운영 프로그램 참여율 67.9% 달성(3,853척 중 2,616척 참여)", "p": "36 / 37", "o": null, "w": null}, {"s": 2, "e": "2050 탄소중립항만 구축 로드맵 탄소배출량 감축률 2030년 30%, 2040년 60%, 2050년 100%", "p": "33 / 34", "o": null, "w": null}, {"s": 1, "e": "GRI 305 배출(Emissions)", "p": "100 / 101", "o": null, "w": null}], "m": "대기오염물질 저감량만 공개하여 ①, ②는 1점 부여함. ⑥감축 목표는 온실가스 감축 목표만 제시되어 2점 부여함. ⑦제3자 검증은 검증 범위에 GRI 305-7 세부 지표가 없어 1점으로 처리함."}, {"o": "여수광양항만공사", "y": 2022, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "CO2 4.3천 톤, 미세먼지 3.2톤 저감", "p": "26 / 27", "o": null, "w": null}, {"s": 1, "e": "CO2 4.3천 톤, 미세먼지 3.2톤 저감", "p": "26 / 27", "o": null, "w": null}, {"s": 1, "e": "항만대기질법 제10조에 따라 ECA를 지정 운영하고 있습니다 저유황유 사용 여부를 수시 확인하고 있으며", "p": "27 / 28", "o": null, "w": null}, {"s": 2, "e": "친환경 하역장비 지원을 통한 전환율 85.6% 달성", "p": "34 / 35", "o": null, "w": null}, {"s": 2, "e": "선박저속운항 프로그램(VSR) 도입 3,812척 대상 중 3,083척 참여(80.8%)", "p": "35 / 36", "o": null, "w": null}, {"s": 2, "e": "미세먼지 감축률을 정부 전망 대비 10배 이상인 30%로 2030년까지 달성할 계획입니다", "p": "24 / 25", "o": null, "w": null}, {"s": 1, "e": "GRI 305-1, 305-2", "p": "90 / 91", "o": null, "w": null}], "m": "대기오염물질 저감량만 공개하여 ①, ②는 1점 부여함. ⑥감축 목표에 미세먼지 감축 수치는 있으나 기준연도가 없어 2점 부여함. ⑦제3자 검증은 GRI 305-7 명시가 없어 1점으로 처리함."}, {"o": "여수광양항만공사", "y": 2023, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "CO2 18.7천 톤과 미세먼지 13.2톤을 저감", "p": "26 / 27", "o": null, "w": null}, {"s": 1, "e": "CO2 18.7천 톤과 미세먼지 13.2톤을 저감", "p": "26 / 27", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드 저유황유, 황 함유량, 황산화물 등, 해당 문장 없음", "p": "- / -", "o": null, "w": null}, {"s": 2, "e": "터미널 크레인 17대를 전기 동력으로 전환", "p": "26 / 27", "o": null, "w": null}, {"s": 2, "e": "선박 저속운항 프로그램(VSR) 대상 4,225척, 참여 3,396척 참여율 80.4%", "p": "35 / 36", "o": null, "w": null}, {"s": 2, "e": "2035년까지 총 10,000tCO2-eq 탄소배출권 확보 목표", "p": "26 / 27", "o": null, "w": null}, {"s": 3, "e": "GRI 305 305-1~5, 305-7", "p": "88 / 89", "o": null, "w": null}], "m": "대기오염물질 저감량만 공개하여 ①, ②는 1점 부여함. ⑥감축 목표는 온실가스 감축 목표만 제시되어 2점 부여함. ⑦제3자 검증은 검증 범위에 GRI 305-7 명시 및 검증 수준과 결론 문구가 모두 있어 3점 부여함."}, {"o": "여수광양항만공사", "y": 2024, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "2024년 한 해 동안 미세먼지 27톤, 온실가스 4.1만 톤을 저감하는 성과", "p": "21 / 22", "o": null, "w": null}, {"s": 1, "e": "2024년 한 해 동안 미세먼지 27톤, 온실가스 4.1만 톤을 저감하는 성과", "p": "21 / 22", "o": null, "w": null}, {"s": 1, "e": "대기질 개선을 위한 선박 황산화물 배출규제 시행 저유황유 사용 여부를 수시 확인하고 있으며 24년 11월 위험화물운반선 시료 채취 황 함유량이 기준치 만족함을 확인", "p": "27 / 28", "o": null, "w": null}, {"s": 2, "e": "하역장비 T/C 15대 전기전환 지원, 전기 Y/T 10대 임대", "p": "34 / 35", "o": null, "w": null}, {"s": 2, "e": "선박 저속운항 프로그램(VSR) 운영 대상 3,907척, 참여 3,663척 참여율 93.7%", "p": "35 / 36", "o": null, "w": null}, {"s": 2, "e": "2035년까지 총 10,000tCO2-eq의 탄소배출권 확보를 목표", "p": "26 / 27", "o": null, "w": null}, {"s": 1, "e": "GRI 305 배출(GHG Emissions)", "p": "84 / 85", "o": null, "w": null}], "m": "대기오염물질 저감량만 공개하여 ①, ②는 1점 부여함. ⑥감축 목표는 온실가스 감축 목표만 제시되어 2점 부여함. ⑦제3자 검증보고서에 GRI 305-7 세부 지표가 명시되지 않아 1점으로 처리함."}, {"o": "인천항만공사", "y": 2018, "g": "항만공사", "by": "연구팀", "it": [{"s": 3, "e": "대기오염물질 배출 현황(단위 천 톤): SOx 2017 1.456 → 2018 1.286", "p": "인쇄 75 / PDF 36", "o": null, "w": null}, {"s": 3, "e": "대기오염물질 배출 현황(단위 천 톤): NOx 2017 8.137 → 2018 7.679, 먼지 2017 0.324 → 2018 0.315", "p": "인쇄 75 / PDF 36", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드: 저유황유, LSFO, 규제유, 해당 문장 없음", "p": "", "o": null, "w": null}, {"s": 1, "e": "인천항만공사의 주요 친환경 활동실적으로는 … 육상전원공급시설(AMP) 활성화 추진, … 친환경 LNG 연료 추진 선박 도입 등으로 항만분야의 친환경 경영을 인정받아 수상하게 되었습니다.", "p": "인쇄 64 / PDF 31", "o": null, "w": null}, {"s": 3, "e": "인천항만공사는 현재 연안부두 및 북항, 남항, 신항 관공선 부두 68개소의 저압 AMP시설을 운영 중으로 작년 한해 질소산화물 130톤, 황산화물 0.2톤, 초미세먼지 2.3톤, 미세먼지 2.4톤을 감축하는 효과를 거둬 항만주변 대기질 환경개선에 기여하고 있습니다.", "p": "인쇄 60 / PDF 29", "o": null, "w": null}, {"s": 2, "e": "인천항만공사는 ｢경영목표 2025 미세먼지 저감 40% 달성｣을 위한 배출저감 운영 전략을 수립하고 주요 배출원인을 분석하여 미세먼지 저감을 위한 개선활동을 전개하고 있습니다.", "p": "인쇄 62 / PDF 30", "o": null, "w": null}, {"s": 2, "e": "공개항목을 확인하였으며, 아래의 공개항목(Disclosure)을 검증하였습니다. ˙환경: 305-1, 305-2, 305-5, 305-7, 306-2", "p": "인쇄 80 / PDF 39", "o": 3, "w": "검증 범위에 305-7은 있으나 검증 수준·결론 문구 미확인 → 2점(의견서에 있으면 3점)"}], "m": "감축 목표(⑥)는 대기오염물질(미세먼지) 40% 저감이라는 정량 목표이나 기준연도가 없어 2점. 육상전원(⑤)의 저감 수치는 전체 보고서의 대기배출물 검증(GRI 305-7) 범위에 포함된 것으로 판단하여 3점(추정이므로 근거 쪽 확인 권장).감축 목표(⑥)는 대기오염물질(미세먼지) 40% 저감이라는 정량 목표이나 기준연도가 없어 2점. 육상전원(⑤)의 저감 수치는 전체 보고서의 대기배출물 검증(GRI 305-7) 범위에 포함된 것으로 판단하여 3점(추정이므로 근거 쪽 확인 권장). [기준 적용 2026-11-12: ⑦ 3→2점] [확인 필요] ⑦ 검증의견서의 검증 수준·결론 문구."}, {"o": "부산항만공사", "y": 2021, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "부산항의 초미세먼지는 93%, 온실가스는 59%가 발생됩니다.", "p": "인쇄 48 / PDF 48", "o": null, "w": null}, {"s": 2, "e": "초미세먼지 배출량(ton) 1,492 1,564 820 산정 중 925 821 701 597 567 537 507 477 448", "p": "인쇄 47 / PDF 47", "o": null, "w": null}, {"s": 2, "e": "2022년 9월부터 황 함유량 3.5% ▶0.1% 감축 (정박, 계류중인 선박 대상)", "p": "인쇄 48 / PDF 48", "o": null, "w": null}, {"s": 2, "e": "2021년까지 451대를 경유연료에서 친환경 LNG연료로 전환하였으며", "p": "인쇄 49 / PDF 49", "o": null, "w": null}, {"s": 2, "e": "선박 저유황유 사용(ECA) 저속운항해역(VSR) 인센티브 육상전력 사용(AMP)확대", "p": "인쇄 48 / PDF 48", "o": null, "w": null}, {"s": 3, "e": "2030년까지 초미세먼지 70% 감축이라는 목표를 설정하고", "p": "인쇄 5 / PDF 5", "o": null, "w": null}, {"s": 1, "e": "보고서에 담긴 내용에 대한 전반적인 검토", "p": "인쇄 98 / PDF 98", "o": null, "w": null}], "m": "대기오염물질 배출량의 SOx·NOx 개별 총량은 확인되지 않음. 초미세먼지 배출량 표는 확인되나 SOx·NOx 수치로 대체할 수 없음. 제3자 검증 범위에 GRI 305-7 등 대기오염 지표가 명시되지 않음. [확인 필요] ①은 근거 문장에 SOx 언급이 없음(SOx 문장을 찾으면 1, 없으면 0). ⑤는 근거 문장에 수치가 없음(수치 근거가 있으면 2, 없으면 1). ⑥은 기준연도 명시 여부 확인(없으면 2)."}, {"o": "부산항만공사", "y": 2023, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "주요 배출원(선박, 하역장비, 차량)별 오염물질 배출 관리", "p": "인쇄 25 / PDF 13", "o": null, "w": null}, {"s": 2, "e": "부산항 초미세먼지 71% 감축 기준연도('18.) 1,492.5톤 → 431톤('23.)", "p": "인쇄 29 / PDF 15", "o": null, "w": null}, {"s": 0, "e": "선박 배출 온실가스 저감 친환경 선박연료 공급 LNG 벙커링, 바이오 선박유 공급 실증사업", "p": "인쇄 29 / PDF 15", "o": 2, "w": "③ 근거가 연료 황함량이 아니라 친환경 연료 공급이고, 본인 메모에도 황 함량·저유황유 근거 없음 → 0점"}, {"s": 2, "e": "하역장비 동력원 친환경 전환 94% 완료 트랜스퍼크레인 98%, 야드트랙터 92%", "p": "인쇄 29 / PDF 15", "o": null, "w": null}, {"s": 2, "e": "선박전원 육상전력공급설비 6,664MWh 이용", "p": "인쇄 27 / PDF 14", "o": null, "w": null}, {"s": 3, "e": "2030년까지 기준연도 대비 초미세먼지 72% 감축", "p": "인쇄 25 / PDF 13", "o": null, "w": null}, {"s": 1, "e": "제3자 검증 의견서", "p": "검증 의견서 쪽 확인 필요", "o": null, "w": null}], "m": "SOx·NOx 개별 배출량 총량은 확인되지 않음. 초미세먼지 배출량 431톤은 확인됨. 황 함량 기준 또는 저유황유 사용 실적은 현재 확인한 페이지에서 구체적 근거를 찾지 못함. 검증 의견서의 대기오염 지표 검증 여부는 추가 확인 필요.SOx·NOx 개별 배출량 총량은 확인되지 않음. 초미세먼지 배출량 431톤은 확인됨. 황 함량 기준 또는 저유황유 사용 실적은 현재 확인한 페이지에서 구체적 근거를 찾지 못함. 검증 의견서의 대기오염 지표 검증 여부는 추가 확인 필요. [기준 적용 2026-11-12: ③ 2→0점] [확인 필요] ⑦ 검증의견서 쪽·범위 확인. ④는 근거를 LNG 벙커링(서술)과 하역장비 94%(수치) 중 어느 쪽으로 보는지 확인."}, {"o": "부산항만공사", "y": 2024, "g": "항만공사", "by": "연구팀", "it": [{"s": 1, "e": "오염물질 관리 및 환경영향 저감", "p": "인쇄 28 / PDF 28", "o": null, "w": null}, {"s": 1, "e": "부산항 초미세먼지 감축률(기준연도 대비) 72.9% 75% 이상", "p": "인쇄 38 / PDF 29", "o": 2, "w": "② 근거가 감축률(%)뿐이고 배출량(kg·톤) 수치가 없어 → 저감량만 공개 규칙으로 1점"}, {"s": 1, "e": "친환경 연료(LNG, 메탄올 등) 공급 기반 구축", "p": "인쇄 100 / PDF 100", "o": null, "w": null}, {"s": 2, "e": "하역장비 친환경 전환율 100%", "p": "인쇄 38 / PDF 29", "o": null, "w": null}, {"s": 1, "e": "선박저속운항(VSR) 인센티브 제공 · 선박육상전원공급설비(AMP) 구축·운영", "p": "인쇄 100 / PDF 100", "o": null, "w": null}, {"s": 2, "e": "부산항 초미세먼지 감축률(기준연도 대비) 72.9% 75% 이상", "p": "인쇄 38 / PDF 29", "o": null, "w": null}, {"s": 1, "e": "제3자 검증 의견서", "p": "검증 의견서 페이지 확인 필요", "o": null, "w": null}], "m": "환경 관련 페이지의 이미지 판독이 제한되어 실제 배출량·연료 전환 실적·AMP 이용 실적 및 검증 범위를 충분히 확인하지 못함. 2024년 성과표의 72.9%와 목표 75%는 확인했으나 목표연도와 기준연도 세부사항은 원문 재확인 필요.환경 관련 페이지의 이미지 판독이 제한되어 실제 배출량·연료 전환 실적·AMP 이용 실적 및 검증 범위를 충분히 확인하지 못함. 2024년 성과표의 72.9%와 목표 75%는 확인했으나 목표연도와 기준연도 세부사항은 원문 재확인 필요. [기준 적용 2026-11-12: ② 2→1점] [재채점 권장] 이미지 판독 제한으로 임시 점수. ③은 근거가 연료 황함량이 아님(없으면 0). ⑦ 검증의견서 확인."}, {"o": "인천항만공사", "y": 2019, "g": "항만공사", "by": "연구팀", "it": [{"s": 3, "e": "대기오염물질 배출 현황(단위 천톤): SOx 2017 1.457 → 2018 1.286 → 2019 1.365", "p": "PDF 44쪽", "o": null, "w": null}, {"s": 3, "e": "NOx 2017 10.355 → 2018 9.478 → 2019 9.169, 미세먼지(PM10) 0.405 → 0.401 → 0.379 (단위 천톤)", "p": "PDF 44쪽", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드: 저유황유, LSFO, 규제유, 황함량 — 해당 문장 없음", "p": "", "o": null, "w": null}, {"s": 1, "e": "국내최초 LNG예선 개발로 노후디젤선 대체 … SOx 100%", "p": "PDF 33쪽", "o": null, "w": null}, {"s": 1, "e": "선박용 전원공급장치 확대 · 대형선박용 전원공급장치 시범사업 확대 … SOx 73%, PM2.5 66%", "p": "PDF 33쪽", "o": null, "w": null}, {"s": 2, "e": "2025년까지 인천항에서 발생하는 미세먼지 40% 저감을 목표로 설정하고 선박의 육상전원공급 활성화, 신재생에너지 도입 등 대기오염 저감을 위해 노력하고 있습니다.", "p": "PDF 33·47쪽", "o": null, "w": null}, {"s": 3, "e": "AA1000AS 유형2(Type 2) 검증 … 환경: 303-1, 305-1, 305-2, 305-5, 305-7, 306-2", "p": "PDF 46쪽", "o": null, "w": null}], "m": "원문 PDF로 직접 확인. 같은 항목의 수치가 2020년 보고서와 다름(2018년 NOx 2019년판 9.478 vs 2020년판 6.093천톤) → 산정 기준이 바뀐 것으로 보이며 연도 간 직접 비교는 주의."}, {"o": "인천항만공사", "y": 2020, "g": "항만공사", "by": "연구팀", "it": [{"s": 3, "e": "대기오염물질 배출 현황(단위 천톤): SOx 2017 1.209 → 2018 1.072 → 2019 1.162 → 2020 0.530", "p": "PDF 89쪽", "o": null, "w": null}, {"s": 3, "e": "NOx 6.701 → 6.093 → 5.910 → 5.084, 초미세먼지(PM2.5) 0.210 → 0.190 → 0.180 → 0.140 (단위 천톤)", "p": "PDF 89쪽", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드: 저유황유, LSFO, 규제유, 황함량 — 해당 문장 없음", "p": "", "o": null, "w": null}, {"s": 2, "e": "노후선박 친환경 대체건조 → 화석 LNG연료엔진 전환 ▶ 건조공정률 75.9%(21년 6월 완료) 저감효과 SOx 99%↓, PM2.5 98%↓", "p": "PDF 33쪽", "o": 1, "w": "초안(Gemini) 1점 → 건조공정률 수치가 있어 2점"}, {"s": 2, "e": "▶ 고압용 5기, 저압용 68기 운영 … 저감효과 SOx 73%↓, PM2.5 66%↓", "p": "PDF 33쪽", "o": null, "w": null}, {"s": 3, "e": "2030년까지 미세먼지 60% 저감을 목표 … 기준년도 대비 미세먼지 배출저감률 33.6% 달성: PM2.5 210.4(2017) → 139.7t(2020)", "p": "PDF 30·33쪽", "o": null, "w": null}, {"s": 3, "e": "AA1000AS v3에 따라 ‘중간수준(moderate level)’ 검증 … 대기배출(Emissions): 305-1, 305-2, 305-5, 305-7", "p": "PDF 98쪽", "o": null, "w": null}], "m": "원문 PDF로 직접 확인. ⑦은 검증 범위·수준·결론이 모두 있어 3점이나, 의견서에 ‘원본 데이터의 신뢰성 확인은 수행하지 않았다’는 한계 문구가 있음."}, {"o": "인천항만공사", "y": 2021, "g": "항만공사", "by": "연구팀", "it": [{"s": 3, "e": "대기오염물질 배출 현황(단위 천톤): SOx 2019 1.146 → 2020 0.714 → 2021 0.354", "p": "PDF 51쪽", "o": null, "w": null}, {"s": 3, "e": "NOx 5.979 → 5.056 → 4.902, 초미세먼지(PM2.5) 0.180 → 0.149 → 0.116 (단위 천톤)", "p": "PDF 51쪽", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드: 저유황유, LSFO, 규제유, 황함량 — 해당 문장 없음", "p": "", "o": null, "w": null}, {"s": 2, "e": "국내 최초 LNG 예선 건조 및 도입", "p": "PDF 21·22쪽", "o": null, "w": null}, {"s": 2, "e": "(’20년) 고압 AMP 1개 → (’21년) 고압 3개, 저압 2개 (설치 수치만 있고 저감량 없음)", "p": "PDF 11쪽", "o": null, "w": null}, {"s": 3, "e": "2030목표 미세먼지 60% 저감 … (기준년도) 2017 … 2021 기준치 대비 45.7%", "p": "PDF 8·11쪽", "o": 2, "w": "초안(Gemini) 2점 → 11쪽 표에 기준년도 2017이 명시되어 3점"}, {"s": 3, "e": "더씨에스알 … 탄소배출 305-1, 305-2, 305-5, 305-7 … 일반수준 검증(Moderate Assurance Level)", "p": "PDF 57쪽", "o": null, "w": null}], "m": "원문 PDF로 직접 확인."}, {"o": "인천항만공사", "y": 2023, "g": "항만공사", "by": "연구팀", "it": [{"s": 0, "e": "GRI 색인(90쪽)은 305-7을 79쪽으로 안내하나, 79쪽에는 폐기물·저공해 차량·환경법규 위반·친환경 구매 표만 있고 SOx 배출량은 없음", "p": "PDF 79·90쪽", "o": null, "w": null}, {"s": 0, "e": "같은 이유로 NOx·PM 배출량 표 없음 (보고서 전체에서 확인되지 않음)", "p": "PDF 79·90쪽", "o": null, "w": null}, {"s": 0, "e": "찾은 키워드: 저유황유, LSFO, 규제유, 황함량 — 해당 문장 없음", "p": "", "o": null, "w": null}, {"s": 1, "e": "저탄소·녹색성장 환경경영 체계 구축 … 국내최초 LNG 추진 예인선 송도호", "p": "PDF 26쪽", "o": null, "w": null}, {"s": 2, "e": "저압 AMP 56개소, 고압 AMP 3개소를 설치하여 운영하고 있습니다. (설치 수치만 있고 저감량 없음)", "p": "PDF 34쪽", "o": null, "w": null}, {"s": 2, "e": "2035년에 온실가스 50% 감축과 2030년 미세먼지 60% 저감을 목표로 환경경영활동을 추진 (기준연도 없음)", "p": "PDF 26쪽", "o": null, "w": null}, {"s": 2, "e": "한국공공ESG연구원 … GRI 300(환경): … 305-1, 305-2, 305-3, 305-5, 305-7 … (검증 범위 포함, 수준·결론 문구 미확인)", "p": "PDF 91쪽", "o": 3, "w": "초안(Gemini) 3점 → 검증 수준·결론 문구 미확인 2점"}], "m": "원문 PDF로 직접 확인. ①②는 텍스트 추출 한계가 아니라 79쪽에 수치가 실제로 없어 0점."}];
+(function(){
+'use strict';
+var NM=['① SOx 배출량','② NOx·PM 배출량','③ 연료 황함량·저유황유','④ 스크러버·대체연료','⑤ 육상전원·저속운항','⑥ 감축 목표','⑦ 제3자 검증'];
+var SH=['① SOx','② NOx·PM','③ 연료 황함량','④ 스크러버 대체연료','⑤ 육상전원 저속운항','⑥ 감축 목표','⑦ 제3자 검증'];
+var PER={A:'A 규제 전',B:'B 2020~21',C:'C 2022~'};
+var PERFULL={A:'A 규제 전 (2019년 이전)',B:'B IMO 0.5%·정박 0.1% (2020~2021)',C:'C 전 해역 0.1% (2022년 이후)'};
+var ORD=['HMM','팬오션','대한해운','울산항만공사','인천항만공사','부산항만공사','여수광양항만공사'];
+var KEY='esg-user-rows-v1';
+function g(i){return document.getElementById(i)}
+function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function clip(t,n){t=String(t||'');return t.length>n?t.slice(0,n)+'…':t}
+function per(y){return y<=2019?'A':(y<=2021?'B':'C')}
+function tot(r){return r.it.reduce(function(a,b){return a+b.s},0)}
+function mean(a){return a.length?a.reduce(function(x,y){return x+y},0)/a.length:null}
+function f1(v){return v==null?'-':v.toFixed(1)}
+
+var R=(RESULTS||[]).map(function(r){r.user=false;r.id='t'+r.o+r.y;return r});
+function loadUser(){try{var s=localStorage.getItem(KEY);if(s){JSON.parse(s).forEach(function(r){r.user=true;R.push(r)})}}catch(e){}}
+function saveUser(){try{localStorage.setItem(KEY,JSON.stringify(R.filter(function(r){return r.user})))}catch(e){}}
+function sortR(){R.sort(function(a,b){var x=ORD.indexOf(a.o),y=ORD.indexOf(b.o);x=x<0?99:x;y=y<0?99:y;return x-y||(a.o<b.o?-1:a.o>b.o?1:0)||a.y-b.y||(a.user?1:0)-(b.user?1:0)})}
+loadUser();sortR();
+
+var flt='전체',pf='전체',open={},pres=false,flash='';
+function rows(){return R.filter(function(r){return (flt==='전체'||r.g===flt)&&(pf==='전체'||per(r.y)===pf)})}
+
+function chips(el,vals,cur,fn){
+  g(el).innerHTML=vals.map(function(v){return '<button type="button" data-v="'+esc(v[0])+'" aria-pressed="'+(cur===v[0])+'">'+esc(v[1])+'</button>'}).join('');
+  [].forEach.call(g(el).querySelectorAll('button'),function(b){b.onclick=function(){fn(b.getAttribute('data-v'))}});
+}
+function filters(){
+  chips('fl',[['전체','전체'],['선사','선사'],['항만공사','항만공사']],flt,function(v){flt=v;open={};all()});
+  var cnt={};['A','B','C'].forEach(function(p){cnt[p]=R.filter(function(r){return (flt==='전체'||r.g===flt)&&per(r.y)===p}).length});
+  chips('fp',[['전체','전체 구간'],['A',PER.A+' ('+cnt.A+')'],['B',PER.B+' ('+cnt.B+')'],['C',PER.C+' ('+cnt.C+')']],pf,function(v){pf=v;open={};all()});
+}
+function kpi(rs){
+  var orgs={};rs.forEach(function(r){orgs[r.o]=1});var ys=rs.map(function(r){return r.y});
+  g('kpi').innerHTML=rs.length?'<div><b>'+rs.length+'</b>건 채점</div><div><b>'+Object.keys(orgs).length+'</b>개 기관</div><div><b>'+Math.min.apply(0,ys)+(Math.min.apply(0,ys)===Math.max.apply(0,ys)?'':'~'+Math.max.apply(0,ys))+'</b>실적연도</div><div><b>'+f1(mean(rs.map(tot)))+'</b>평균 총점 / 21</div>':'<div>선택한 조건에 해당하는 채점 결과가 없습니다.</div>';
+}
+function cards(rs){
+  var who=(flt==='전체'?'전체':flt)+(pf==='전체'?'':' · '+PER[pf]);
+  var h='';
+  if(rs.length){
+    var m=NM.map(function(_,i){return mean(rs.map(function(r){return r.it[i].s}))});
+    var lo=0,hi=0;m.forEach(function(v,i){if(v<m[lo])lo=i;if(v>m[hi])hi=i});
+    h+='<div class="card"><span>가장 약한 항목</span><b>'+esc(NM[lo])+'</b><em>평균 '+f1(m[lo])+'점 / 3</em><small>'+esc(who)+' '+rs.length+'건 기준</small></div>';
+    h+='<div class="card"><span>가장 강한 항목</span><b>'+esc(NM[hi])+'</b><em>평균 '+f1(m[hi])+'점 / 3</em><small>'+esc(who)+' '+rs.length+'건 기준</small></div>';
+  }else h+='<div class="card wide"><span>선택한 조건</span><b>해당 결과 없음</b><small>구간이나 기관 유형을 바꿔 보세요.</small></div>';
+  g('cards').innerHTML=h;
+}
+function table(rs){
+  var h='<thead><tr><th>기관</th><th>실적연도</th>';
+  SH.forEach(function(n,i){h+='<th class="it7" title="'+esc(NM[i])+'">'+esc(n)+'</th>'});
+  h+='<th>총점</th></tr></thead><tbody>';
+  var prev='';
+  rs.forEach(function(r){
+    var gs=r.o!==prev&&prev!=='';prev=r.o;
+    h+='<tr class="row'+(gs?' gstart':'')+(flash===r.id?' flash':'')+'" data-k="'+esc(r.id)+'" tabindex="0" role="button" aria-expanded="'+(!!open[r.id])+'"><td><b>'+esc(r.o)+'</b><small>'+esc(r.g)+'</small>'+(r.user?'<span class="utag">직접 추가</span>':'')+'</td><td>'+r.y+'</td>';
+    r.it.forEach(function(it){h+='<td class="c'+it.s+(it.o!=null?' adj':'')+'" '+(it.o!=null?'title="조정 '+it.o+'→'+it.s+'점"':'')+'>'+it.s+'</td>'});
+    h+='<td class="sumc"><b>'+tot(r)+'</b><i style="--w:'+(tot(r)/21).toFixed(3)+'"></i></td></tr>';
+    if(open[r.id])h+=detail(r);
+  });
+  if(!rs.length)h+='<tr><td colspan="10" style="text-align:left;color:var(--muted)">표시할 행이 없습니다.</td></tr>';
+  g('rt').innerHTML=h+'</tbody>';
+  [].forEach.call(g('rt').querySelectorAll('tr.row'),function(tr){
+    var f=function(){var k=tr.getAttribute('data-k');open[k]=!open[k];flash='';table(rows());var n=g('rt').querySelector('tr.row[data-k="'+k+'"]');if(n)n.focus()};
+    tr.onclick=f;tr.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();f()}};
+  });
+  [].forEach.call(g('rt').querySelectorAll('.delrow'),function(b){b.onclick=function(e){e.stopPropagation();var id=b.getAttribute('data-id');R=R.filter(function(r){return r.id!==id});saveUser();all()}});
+}
+function detail(r){
+  var h='<tr class="det"><td colspan="10"><div class="dg">';
+  r.it.forEach(function(it,i){
+    h+='<div class="dgi"><h4>'+esc(NM[i])+'<em>'+it.s+'점</em>'+(it.o!=null?'<s>'+(r.user?'자동 추정 ':'팀 채점 ')+it.o+'점에서 '+(r.user?'변경':'조정')+'</s>':'')+'</h4><q>'+(it.e?esc(clip(it.e,230)):'근거 문장 없음')+'</q>'+(it.p&&it.p!=='- / -'?'<span class="pg">'+esc(it.p)+'</span>':'')+(it.w&&!r.user?'<span class="why">'+esc(it.w)+'</span>':'')+'</div>';
+  });
+  h+='</div>'+(r.m?'<p class="memo"><b>'+(r.user?'메모':'채점 메모')+'</b> '+esc(r.m)+'</p>':'')+(r.user?'<p class="memo"><button type="button" class="delrow" data-id="'+esc(r.id)+'">이 행 삭제</button></p>':'')+'</td></tr>';
+  return h;
+}
+function avg(){
+  var pr=R.filter(function(r){return pf==='전체'||per(r.y)===pf});
+  var grp=['선사','항만공사'],col=['var(--navy)','var(--teal)'],n={},m={};
+  grp.forEach(function(k){var rs=pr.filter(function(r){return r.g===k});n[k]=rs.length;m[k]=NM.map(function(_,i){return mean(rs.map(function(r){return r.it[i].s}))})});
+  var W=560,L=168,row=54,H=NM.length*row+8,x=function(v){return L+v/3*(W-L-40)};
+  var s='<svg viewBox="0 0 '+W+' '+(H+16)+'" width="100%" role="img" aria-label="항목별 평균 공시 점수, 선사와 항만공사 비교">';
+  [0,1,2,3].forEach(function(v){s+='<line x1="'+x(v)+'" x2="'+x(v)+'" y1="0" y2="'+(H-6)+'" stroke="var(--line)"/><text x="'+x(v)+'" y="'+(H+10)+'" font-size="11" fill="var(--muted)" text-anchor="middle">'+v+'</text>'});
+  NM.forEach(function(nm,i){
+    var y0=i*row+4;
+    s+='<text x="'+(L-10)+'" y="'+(y0+row/2)+'" font-size="12.5" fill="var(--ink)" text-anchor="end" dominant-baseline="middle">'+esc(nm.replace(/^\S+ /,''))+'</text>';
+    grp.forEach(function(k,j){var v=m[k][i],yy=y0+6+j*19;if(v==null)return;s+='<rect x="'+L+'" y="'+yy+'" width="'+Math.max(x(v)-L,1)+'" height="15" rx="2" fill="'+col[j]+'"/><text x="'+(x(v)+6)+'" y="'+(yy+8)+'" font-size="12" font-weight="700" fill="var(--navy)" dominant-baseline="middle">'+v.toFixed(1)+'</text>'});
+  });
+  s+='</svg><div class="lgd"><span><i style="background:var(--navy)"></i>선사 ('+n['선사']+'건)</span><span><i style="background:var(--teal)"></i>항만공사 ('+n['항만공사']+'건)</span></div>';
+  g('avg').innerHTML=s;
+  g('avgNote').textContent='0 언급 없음 · 1 서술만 · 2 수치 공개 · 3 수치+추이+검증.'+(pf==='전체'?'':' '+PERFULL[pf]+' 구간만 계산했습니다.');
+}
+function periodChart(){
+  var gr=R.filter(function(r){return flt==='전체'||r.g===flt});
+  var W=420,L=96,rh=50,H=3*rh+30,x=function(v){return L+v/21*(W-L-92)};
+  var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="규제 구간별 평균 공시 총점">';
+  [0,7,14,21].forEach(function(v){s+='<line x1="'+x(v)+'" x2="'+x(v)+'" y1="4" y2="'+(3*rh)+'" stroke="var(--line)"/><text x="'+x(v)+'" y="'+(3*rh+16)+'" font-size="11" fill="var(--muted)" text-anchor="middle">'+v+'</text>'});
+  ['A','B','C'].forEach(function(p,i){
+    var rs=gr.filter(function(r){return per(r.y)===p}),v=mean(rs.map(tot)),y=8+i*rh;
+    s+='<text x="'+(L-10)+'" y="'+(y+14)+'" font-size="12.5" fill="var(--ink)" text-anchor="end" dominant-baseline="middle">'+PER[p]+'</text>';
+    if(v==null)s+='<text x="'+(L+4)+'" y="'+(y+14)+'" font-size="12" fill="var(--muted)" dominant-baseline="middle">자료 없음</text>';
+    else s+='<rect x="'+L+'" y="'+y+'" width="'+(x(v)-L)+'" height="28" rx="3" fill="var(--indigo)"/><text x="'+(x(v)+6)+'" y="'+(y+14)+'" font-size="12.5" font-weight="700" fill="var(--navy)" dominant-baseline="middle">'+v.toFixed(1)+'점 ('+rs.length+'건)</text>';
+  });
+  g('pc').innerHTML=s+'</svg>';
+  g('pcNote').textContent=(flt==='전체'?'선사와 항만공사 전체':flt)+'의 평균 총점입니다. 규제 시점을 지나도 점수가 함께 오르는 흐름은 뚜렷하지 않고, 기관마다 건수가 적어 추세로는 해석하지 않습니다.';
+}
+function ports(){
+  var inc=R.filter(function(r){return r.o==='인천항만공사'}),bus=R.filter(function(r){return r.o==='부산항만공사'});
+  var im=inc.length?mean(inc.map(tot)):null,bm=bus.length?mean(bus.map(tot)):null;
+  var idx=[36,46,53],nm=['평택항','인천항','부산항'],c=['var(--navy)','var(--indigo)','var(--sky)'];
+  function panel(title,vals,max,lab,ref){
+    var W=300,L=56,rh=46,H=3*rh+34,x=function(v){return L+v/max*(W-L-70)};
+    var s='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="'+esc(title)+'">';
+    if(ref)s+='<line x1="'+x(ref[0])+'" x2="'+x(ref[0])+'" y1="14" y2="'+(H-6)+'" stroke="var(--alert)" stroke-dasharray="4 3"/><text x="'+x(ref[0])+'" y="10" font-size="10.5" fill="var(--alert)" font-weight="700" text-anchor="middle">'+ref[1]+'</text>';
+    nm.forEach(function(n,i){
+      var y=22+i*rh;
+      s+='<text x="'+(L-8)+'" y="'+(y+13)+'" font-size="12.5" fill="var(--ink)" text-anchor="end" dominant-baseline="middle">'+n+'</text>';
+      if(vals[i]==null){s+='<rect x="'+L+'" y="'+y+'" width="'+(W-L-6)+'" height="26" rx="3" fill="none" stroke="var(--gray)" stroke-dasharray="5 4"/><text x="'+(L+(W-L-6)/2)+'" y="'+(y+14)+'" font-size="11.5" font-weight="700" fill="var(--alert)" text-anchor="middle" dominant-baseline="middle">보고서 확인 안 됨</text>'}
+      else s+='<rect x="'+L+'" y="'+y+'" width="'+(x(vals[i])-L)+'" height="26" rx="3" fill="'+c[i]+'"/><text x="'+(x(vals[i])+6)+'" y="'+(y+14)+'" font-size="12.5" font-weight="700" fill="var(--navy)" dominant-baseline="middle">'+lab[i]+'</text>';
+    });
+    return '<div><h3>'+title+'</h3>'+s+'</svg></div>';
+  }
+  g('ports').innerHTML='<div class="pgrid">'+panel('2024년 SO₂ 지수 (2019=100)',idx,100,idx.map(String),[70,'전국 70'])+panel('ESG 공시 총점 (21점 만점)',[null,im,bm],21,['',f1(im)+'점',f1(bm)+'점 (평균)'])+'</div>';
+}
+function adj(){
+  var rs=[];R.forEach(function(r){if(r.user)return;r.it.forEach(function(it,i){if(it.o!=null)rs.push([r.o,r.y,NM[i],it.o,it.s,it.w])})});
+  g('adjSum').textContent='점수 조정 내역 ('+rs.length+'건)';
+  var h='<thead><tr><th>기관</th><th>실적연도</th><th>항목</th><th>팀 채점</th><th>조정</th><th>이유</th></tr></thead><tbody>';
+  rs.forEach(function(x){h+='<tr><td>'+esc(x[0])+'</td><td>'+x[1]+'</td><td>'+esc(x[2])+'</td><td>'+x[3]+'</td><td><b>'+x[4]+'</b></td><td>'+esc(x[5])+'</td></tr>'});
+  g('adjT').innerHTML=h+'</tbody>';
+}
+function all(){
+  var rs=rows();filters();kpi(rs);cards(rs);table(rs);avg();periodChart();adj();
+  var nu=R.filter(function(r){return r.user}).length;
+  g('userNote').textContent=nu?'직접 추가한 '+nu+'건이 포함되어 있습니다. 이 브라우저에만 저장됩니다.':'';
+}
+function setPres(on,push){
+  pres=on;document.body.classList.toggle('pres',on);
+  if(push)hash(on?'present':'results');
+}
+function hash(h){try{history.replaceState(null,'','#'+h)}catch(e){location.hash=h}}
+function tab(t,push){
+  var res=t!=='checker';
+  g('viewResults').hidden=!res;g('viewChecker').hidden=res;
+  g('tabResults').setAttribute('aria-selected',res);g('tabChecker').setAttribute('aria-selected',!res);
+    if(!res)setPres(false);
+  if(push)hash(res?'results':'checker');
+}
+function route(){var h=location.hash;if(h==='#checker')tab('checker');else{tab('results');setPres(false)}}
+g('tabResults').onclick=function(){tab('results',1)};g('tabChecker').onclick=function(){tab('checker',1)};
+window.addEventListener('hashchange',route);
+
+/* 점검 도구에서 넘어오는 행 */
+window.ESG_ADD=function(row){
+  if(!row||!row.o||!row.y)return false;
+  row.user=true;row.id='u'+Date.now();R.push(row);sortR();saveUser();
+  flt='전체';pf='전체';open={};open[row.id]=true;flash=row.id;
+  tab('results',1);all();
+  var el=g('rt').querySelector('tr.row[data-k="'+row.id+'"]');
+  if(el&&el.scrollIntoView){try{el.scrollIntoView({block:'center'})}catch(e){}}
+  return true;
+};
+all();route();
+})();
+</script>
+
+</body>
+</html>
